@@ -6,7 +6,7 @@ edition = "2021"
 
 description = "Rust implementation of the Diffusers library using Torch."
 repository = "https://github.com/LaurentMazare/diffusers-rs"
-keywords = ["pytorch", "deep-learning", "machine-learning", "diffusion", "transformers", "nlp"]
+keywords = ["pytorch", "deep-learning", "machine-learning", "diffusion", "transformers"]
 categories = ["science"]
 license = "MIT/Apache-2.0"
 readme = "README.md"
