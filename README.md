@@ -15,14 +15,14 @@ the following command. At each step, some `sd_*.png` image is generated, the las
 should be the least noisy one.
 
 ```bash
-cargo run --example stable-diffusion --features clap -- "A rusty robot holding a fire torch."
+cargo run --example stable-diffusion --features clap -- --prompt "A rusty robot holding a fire torch."
 ```
 
 This requires a GPU with more than 8GB of memory, as a fallback the CPU version can be used
 but is slower.
 
 ```bash
-cargo run --example stable-diffusion --features clap -- "A rusty robot holding a fire torch." cpu
+cargo run --example stable-diffusion --features clap -- --prompt "A very rusty robot holding a fire torch." --cpu
 ```
 
 The only supported scheduler is the Denoising Diffusion Implicit Model scheduler (DDIM). The

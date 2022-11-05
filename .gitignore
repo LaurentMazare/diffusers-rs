@@ -1,4 +1,5 @@
 target/
+target2/
 _build/
 data/
 gen/.merlin
@@ -9,3 +10,5 @@ Cargo.lock
 __pycache__
 *~
 .*~
+sd_*jpg
+sd_*png

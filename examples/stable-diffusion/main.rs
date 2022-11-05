@@ -37,6 +37,7 @@
 //
 //   cargo run --release --example tensor-tools cp ./data/vae.npz ./data/vae.ot
 //   cargo run --release --example tensor-tools cp ./data/unet.npz ./data/unet.ot
+use clap::Parser;
 use diffusers::{
     models::{unet_2d, vae},
     schedulers::ddim,
@@ -98,24 +99,37 @@ fn build_unet(device: Device) -> anyhow::Result<unet_2d::UNet2DConditionModel> {
     Ok(unet)
 }
 
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// The prompt to be used for image generation.
+    #[arg(long)]
+    prompt: Option<String>,
+
+    /// When set, use the CPU even if some CUDA devices are available.
+    #[arg(long)]
+    cpu: bool,
+
+    /// The number of steps to run the diffusion for.
+    #[arg(long, default_value_t = 30)]
+    n_steps: usize,
+
+    /// The name of the final image to generate.
+    #[arg(long, value_name = "FILE")]
+    final_image: Option<String>,
+}
+
 fn main() -> anyhow::Result<()> {
+    let args = Args::parse();
     tch::maybe_init_cuda();
     println!("Cuda available: {}", tch::Cuda::is_available());
     println!("Cudnn available: {}", tch::Cuda::cudnn_is_available());
-    // TODO: Switch to using claps to allow more flags?
-    let mut prompt = "A rusty robot holding a fire torch in its hand".to_string();
-    let mut device = Device::cuda_if_available();
-    for arg in std::env::args().skip(1) {
-        if arg.as_str() == "cpu" {
-            device = Device::Cpu;
-        } else {
-            prompt = arg;
-        }
-    }
-    let n_steps = 30;
-    let scheduler = ddim::DDIMScheduler::new(n_steps, 1000, Default::default());
+    let device = if args.cpu { Device::Cpu } else { Device::cuda_if_available() };
+    let scheduler = ddim::DDIMScheduler::new(args.n_steps, 1000, Default::default());
 
     let tokenizer = clip::Tokenizer::create("data/bpe_simple_vocab_16e6.txt")?;
+    let prompt =
+        args.prompt.unwrap_or("A rusty robot holding a fire torch in its hand".to_string());
     let tokens = tokenizer.encode(&prompt)?;
     let str = tokenizer.decode(&tokens);
     println!("Str: {}", str);
@@ -152,12 +166,13 @@ fn main() -> anyhow::Result<()> {
         let (noise_pred_uncond, noise_pred_text) = (&noise_pred[0], &noise_pred[1]);
         let noise_pred = noise_pred_uncond + (noise_pred_text - noise_pred_uncond) * GUIDANCE_SCALE;
         latents = scheduler.step(&noise_pred, timestep, &latents);
-
-        let image = vae.decode(&(&latents / 0.18215));
-        let image = (image / 2 + 0.5).clamp(0., 1.).to_device(Device::Cpu);
-        let image = (image * 255.).to_kind(Kind::Uint8);
-        tch::vision::image::save(&image, format!("sd_{}.png", timestep_index))?
     }
+
+    let image = vae.decode(&(&latents / 0.18215));
+    let image = (image / 2 + 0.5).clamp(0., 1.).to_device(Device::Cpu);
+    let image = (image * 255.).to_kind(Kind::Uint8);
+    let final_image = args.final_image.unwrap_or("sd_final.png".to_string());
+    tch::vision::image::save(&image, final_image)?;
 
     drop(no_grad_guard);
     Ok(())
