@@ -1,0 +1,24 @@
+[package]
+name = "diffusers"
+version = "0.1.0"
+authors = ["Laurent Mazare <lmazare@gmail.com>"]
+edition = "2021"
+
+description = "Rust implementation of the Diffusers library using Torch."
+repository = "https://github.com/LaurentMazare/diffusers-rs"
+keywords = ["pytorch", "deep-learning", "machine-learning", "diffusers", "stable diffusion"]
+categories = ["science"]
+license = "MIT/Apache-2.0"
+readme = "README.md"
+
+[dependencies]
+anyhow = "1"
+thiserror = "1"
+regex = "1.6.0"
+tch = { git = "https://github.com/LaurentMazare/tch-rs" }
+
+clap = { version = "4.0.19", optional = true }
+
+[[example]]
+name = "stable-diffusion"
+required-features = ["clap"]
