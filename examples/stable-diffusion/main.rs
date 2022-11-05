@@ -161,7 +161,7 @@ fn main() -> anyhow::Result<()> {
     let mut latents = Tensor::randn(&[bsize, 4, HEIGHT / 8, WIDTH / 8], (Kind::Float, device));
 
     for (timestep_index, &timestep) in scheduler.timesteps().iter().enumerate() {
-        println!("Timestep {}/{n_steps}", timestep_index + 1);
+        println!("Timestep {timestep_index}/{n_steps}");
         let latent_model_input = Tensor::cat(&[&latents, &latents], 0);
         let noise_pred = unet.forward(&latent_model_input, timestep as f64, &text_embeddings);
         let noise_pred = noise_pred.chunk(2, 0);
@@ -170,7 +170,7 @@ fn main() -> anyhow::Result<()> {
         latents = scheduler.step(&noise_pred, timestep, &latents);
     }
 
-    println!("Building the unet.");
+    println!("Generating the final image.");
     let image = vae.decode(&(&latents / 0.18215));
     let image = (image / 2 + 0.5).clamp(0., 1.).to_device(Device::Cpu);
     let image = (image * 255.).to_kind(Kind::Uint8);
