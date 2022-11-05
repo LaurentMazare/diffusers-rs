@@ -114,6 +114,10 @@ struct Args {
     #[arg(long, default_value_t = 30)]
     n_steps: usize,
 
+    /// The random seed to be used for the generation.
+    #[arg(long, default_value_t = 32)]
+    seed: i64,
+
     /// The name of the final image to generate.
     #[arg(long, value_name = "FILE")]
     final_image: Option<String>,
@@ -129,7 +133,7 @@ fn main() -> anyhow::Result<()> {
 
     let tokenizer = clip::Tokenizer::create("data/bpe_simple_vocab_16e6.txt")?;
     let prompt =
-        args.prompt.unwrap_or("A rusty robot holding a fire torch in its hand".to_string());
+        args.prompt.unwrap_or_else(|| "A rusty robot holding a fire torch in its hand".to_string());
     let tokens = tokenizer.encode(&prompt)?;
     let str = tokenizer.decode(&tokens);
     println!("Str: {}", str);
@@ -154,8 +158,7 @@ fn main() -> anyhow::Result<()> {
     let unet = build_unet(device)?;
 
     let bsize = 1;
-    // DETERMINISTIC SEEDING
-    tch::manual_seed(32);
+    tch::manual_seed(args.seed);
     let mut latents = Tensor::randn(&[bsize, 4, HEIGHT / 8, WIDTH / 8], (Kind::Float, device));
 
     for (timestep_index, &timestep) in scheduler.timesteps().iter().enumerate() {
@@ -171,7 +174,7 @@ fn main() -> anyhow::Result<()> {
     let image = vae.decode(&(&latents / 0.18215));
     let image = (image / 2 + 0.5).clamp(0., 1.).to_device(Device::Cpu);
     let image = (image * 255.).to_kind(Kind::Uint8);
-    let final_image = args.final_image.unwrap_or("sd_final.png".to_string());
+    let final_image = args.final_image.unwrap_or_else(|| "sd_final.png".to_string());
     tch::vision::image::save(&image, final_image)?;
 
     drop(no_grad_guard);
