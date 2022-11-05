@@ -1,6 +1,6 @@
 [package]
 name = "diffusers"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Laurent Mazare <lmazare@gmail.com>"]
 edition = "2021"
 
@@ -26,3 +26,6 @@ clap = { version = "4.0.19", optional = true, features = ["derive"] }
 [[example]]
 name = "stable-diffusion"
 required-features = ["clap"]
+
+[package.metadata.docs.rs]
+features = ["doc-only"]
