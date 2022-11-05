@@ -1,16 +1,34 @@
+//! # Denoising Diffusion Implicit Models
+//!
+//! The Denoising Diffusion Implicit Models (DDIM) is a simple scheduler
+//! similar to Denoising Diffusion Probabilistic Models (DDPM). The DDPM
+//! generative process is the reverse of a Markovian process, DDIM generalizes
+//! this to non-Markovian guidance.
+//!
+//! Denoising Diffusion Implicit Models, J. Song et al, 2020.
+//! https://arxiv.org/abs/2010.02502
 use tch::{kind, Kind, Tensor};
 
+/// This represents how beta ranges from its minimum value to the maximum
+/// during training.
 #[derive(Debug, Clone, Copy)]
 pub enum BetaSchedule {
+    /// Linear interpolation.
     Linear,
+    /// Linear interpolation of the square root of beta.
     ScaledLinear,
 }
 
+/// The configuration for the DDIM scheduler.
 #[derive(Debug, Clone, Copy)]
 pub struct DDIMSchedulerConfig {
+    /// The value of beta at the beginning of training.
     pub beta_start: f64,
+    /// The value of beta at the end of training.
     pub beta_end: f64,
+    /// How beta evolved during training.
     pub beta_schedule: BetaSchedule,
+    /// The amount of noise to be added at each step.
     pub eta: f64,
 }
 
@@ -25,6 +43,7 @@ impl Default for DDIMSchedulerConfig {
     }
 }
 
+/// The DDIM scheduler.
 #[derive(Debug, Clone)]
 pub struct DDIMScheduler {
     timesteps: Vec<usize>,
@@ -35,6 +54,9 @@ pub struct DDIMScheduler {
 
 // clip_sample: False, set_alpha_to_one: False
 impl DDIMScheduler {
+    /// Creates a new DDIM scheduler given the number of steps to be
+    /// used for inference as well as the number of steps that was used
+    /// during training.
     pub fn new(
         inference_steps: usize,
         train_timesteps: usize,
@@ -67,8 +89,9 @@ impl DDIMScheduler {
         self.timesteps.as_slice()
     }
 
-    // https://github.com/huggingface/diffusers/blob/6e099e2c8ce4c4f5c7318e970a8c093dc5c7046e/src/diffusers/schedulers/scheduling_ddim.py#L195
+    /// Performs a backward step during inference.
     pub fn step(&self, model_output: &Tensor, timestep: usize, sample: &Tensor) -> Tensor {
+        // https://github.com/huggingface/diffusers/blob/6e099e2c8ce4c4f5c7318e970a8c093dc5c7046e/src/diffusers/schedulers/scheduling_ddim.py#L195
         let prev_timestep = if timestep > self.step_ratio { timestep - self.step_ratio } else { 0 };
 
         let alpha_prod_t = self.alphas_cumprod[timestep];

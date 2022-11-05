@@ -1,3 +1,5 @@
+//! 2D UNet Building Blocks
+//!
 use crate::models::attention::{
     AttentionBlock, AttentionBlockConfig, SpatialTransformer, SpatialTransformerConfig,
 };

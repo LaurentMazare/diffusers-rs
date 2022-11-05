@@ -1,3 +1,7 @@
+//! 2D UNet Denoising Models
+//!
+//! The 2D Unet models take as input a noisy sample and the current diffusion
+//! timestep and return a denoised version of the input.
 use crate::models::embeddings::{TimestepEmbedding, Timesteps};
 use crate::models::unet_2d_blocks::*;
 use tch::{nn, Kind, Tensor};

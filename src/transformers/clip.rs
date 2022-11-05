@@ -1,3 +1,9 @@
+//! Contrastive Language-Image Pre-Training
+//!
+//! Contrastive Language-Image Pre-Training (CLIP) is an architecture trained on
+//! pairs of images with related texts.
+//!
+//! https://github.com/openai/CLIP
 use std::collections::{HashMap, HashSet};
 use std::io::BufRead;
 use tch::{nn, nn::Module, Device, Kind, Tensor};
@@ -5,6 +11,7 @@ use tch::{nn, nn::Module, Device, Kind, Tensor};
 // The config details can be found in the "text_config" section of this json file:
 // https://huggingface.co/openai/clip-vit-large-patch14/blob/main/config.json
 //   "hidden_act": "quick_gelu"
+// These should probably be made configurable instead.
 const VOCAB_SIZE: i64 = 49408;
 const EMBED_DIM: i64 = 768; // a.k.a. config.hidden_size
 const INTERMEDIATE_SIZE: i64 = 3072;
@@ -276,6 +283,7 @@ const PAT: &str =
 
 // This is mostly a Rust rewrite of the original Python CLIP code.
 // https://github.com/openai/CLIP/blob/main/clip/simple_tokenizer.py
+/// A tokenizer for CLIP.
 pub struct Tokenizer {
     re: regex::Regex,
     encoder: HashMap<String, usize>,
@@ -286,6 +294,7 @@ pub struct Tokenizer {
 }
 
 impl Tokenizer {
+    /// Creates a new CLIP tokenizer, this takes as input the path for the bpe vocabulary file.
     pub fn create<T: AsRef<std::path::Path>>(bpe_path: T) -> anyhow::Result<Tokenizer> {
         let bpe_file = std::fs::File::open(bpe_path)?;
         let bpe_lines: Result<Vec<String>, _> = std::io::BufReader::new(bpe_file).lines().collect();
@@ -402,10 +411,13 @@ impl Tokenizer {
         Ok(bpe_tokens)
     }
 
+    /// The main tokenization entry point, takes as input a string and returns the list of tokens.
     pub fn encode(&self, s: &str) -> anyhow::Result<Vec<usize>> {
         self.encode_pad(s, Some(MAX_POSITION_EMBEDDINGS))
     }
 
+    /// The inverse of the tokenization process, takes as input a list of tokens and returns a
+    /// string that produces this tokenization.
     pub fn decode(&self, tokens: &[usize]) -> String {
         let s: String = tokens.iter().map(|token| self.decoder[token].as_str()).collect();
         s.replace("</w>", " ")
@@ -575,6 +587,7 @@ impl ClipEncoder {
     }
 }
 
+/// A CLIP transformer based model.
 #[derive(Debug)]
 pub struct ClipTextTransformer {
     embeddings: ClipTextEmbeddings,

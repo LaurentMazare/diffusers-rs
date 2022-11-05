@@ -1,14 +1,28 @@
+//! ResNet Building Blocks
+//!
+//! Some Residual Network blocks used in UNet models.
+//!
+//! Denoising Diffusion Implicit Models, K. He and al, 2015.
+//! https://arxiv.org/abs/1512.03385
 use tch::{nn, Tensor};
 
+/// Configuration for a ResNet block.
 #[derive(Debug, Clone, Copy)]
 pub struct ResnetBlock2DConfig {
+    /// The number of output channels, defaults to the number of input channels.
     pub out_channels: Option<i64>,
     pub temb_channels: Option<i64>,
+    /// The number of groups to use in group normalization.
     pub groups: i64,
     pub groups_out: Option<i64>,
+    /// The epsilon to be used in the group normalization operations.
     pub eps: f64,
+    /// Whether to use a 2D convolution in the skip connection. When using None,
+    /// such a convolution is used if the number of input channels is different from
+    /// the number of output channels.
     pub use_in_shortcut: Option<bool>,
     // non_linearity: silu
+    /// The final output is scaled by dividing by this value.
     pub output_scale_factor: f64,
 }
 

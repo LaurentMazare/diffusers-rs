@@ -124,33 +124,32 @@ struct Args {
 }
 
 fn main() -> anyhow::Result<()> {
-    let args = Args::parse();
+    let Args { prompt, cpu, n_steps, seed, final_image } = Args::parse();
     tch::maybe_init_cuda();
     println!("Cuda available: {}", tch::Cuda::is_available());
     println!("Cudnn available: {}", tch::Cuda::cudnn_is_available());
-    let device = if args.cpu { Device::Cpu } else { Device::cuda_if_available() };
-    let scheduler = ddim::DDIMScheduler::new(args.n_steps, 1000, Default::default());
+    let device = if cpu { Device::Cpu } else { Device::cuda_if_available() };
+    let scheduler = ddim::DDIMScheduler::new(n_steps, 1000, Default::default());
 
     let tokenizer = clip::Tokenizer::create("data/bpe_simple_vocab_16e6.txt")?;
-    let prompt =
-        args.prompt.unwrap_or_else(|| "A rusty robot holding a fire torch in its hand".to_string());
+    let prompt = prompt.unwrap_or_else(|| {
+        "A very realistic photo of a rusty robot walking on a sandy beach".to_string()
+    });
+    println!("Running with prompt \"{prompt}\".");
     let tokens = tokenizer.encode(&prompt)?;
-    let str = tokenizer.decode(&tokens);
-    println!("Str: {}", str);
-    let tokens: Vec<i64> = tokens.iter().map(|x| *x as i64).collect();
+    let tokens: Vec<i64> = tokens.into_iter().map(|x| x as i64).collect();
     let tokens = Tensor::of_slice(&tokens).view((1, -1)).to(device);
     let uncond_tokens = tokenizer.encode("")?;
-    let uncond_tokens: Vec<i64> = uncond_tokens.iter().map(|x| *x as i64).collect();
+    let uncond_tokens: Vec<i64> = uncond_tokens.into_iter().map(|x| x as i64).collect();
     let uncond_tokens = Tensor::of_slice(&uncond_tokens).view((1, -1)).to(device);
-    println!("Tokens: {:?}", tokens);
 
     let no_grad_guard = tch::no_grad_guard();
+
     println!("Building the Clip transformer.");
     let text_model = build_clip_transformer(device)?;
     let text_embeddings = text_model.forward(&tokens);
     let uncond_embeddings = text_model.forward(&uncond_tokens);
     let text_embeddings = Tensor::cat(&[uncond_embeddings, text_embeddings], 0);
-    println!("Text embeddings: {:?}", text_embeddings);
 
     println!("Building the autoencoder.");
     let vae = build_vae(device)?;
@@ -158,11 +157,11 @@ fn main() -> anyhow::Result<()> {
     let unet = build_unet(device)?;
 
     let bsize = 1;
-    tch::manual_seed(args.seed);
+    tch::manual_seed(seed);
     let mut latents = Tensor::randn(&[bsize, 4, HEIGHT / 8, WIDTH / 8], (Kind::Float, device));
 
     for (timestep_index, &timestep) in scheduler.timesteps().iter().enumerate() {
-        println!("Timestep {} {} {:?}", timestep_index, timestep, latents);
+        println!("Timestep {}/{n_steps}", timestep_index + 1);
         let latent_model_input = Tensor::cat(&[&latents, &latents], 0);
         let noise_pred = unet.forward(&latent_model_input, timestep as f64, &text_embeddings);
         let noise_pred = noise_pred.chunk(2, 0);
@@ -171,10 +170,11 @@ fn main() -> anyhow::Result<()> {
         latents = scheduler.step(&noise_pred, timestep, &latents);
     }
 
+    println!("Building the unet.");
     let image = vae.decode(&(&latents / 0.18215));
     let image = (image / 2 + 0.5).clamp(0., 1.).to_device(Device::Cpu);
     let image = (image * 255.).to_kind(Kind::Uint8);
-    let final_image = args.final_image.unwrap_or_else(|| "sd_final.png".to_string());
+    let final_image = final_image.unwrap_or_else(|| "sd_final.png".to_string());
     tch::vision::image::save(&image, final_image)?;
 
     drop(no_grad_guard);

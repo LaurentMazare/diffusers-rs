@@ -1,3 +1,4 @@
+//! Attention Based Building Blocks
 use tch::{nn, nn::Module, Kind, Tensor};
 
 #[derive(Debug)]
@@ -19,6 +20,7 @@ impl Module for GeGlu {
     }
 }
 
+/// A feed-forward layer.
 #[derive(Debug)]
 struct FeedForward {
     project_in: GeGlu,
@@ -28,6 +30,8 @@ struct FeedForward {
 impl FeedForward {
     // The glu parameter in the python code is unused?
     // https://github.com/huggingface/diffusers/blob/d3d22ce5a894becb951eec03e663951b28d45135/src/diffusers/models/attention.py#L347
+    /// Creates a new feed-forward layer based on some given input dimension, some
+    /// output dimension, and a multiplier to be used for the intermediary layer.
     fn new(vs: nn::Path, dim: i64, dim_out: Option<i64>, mult: i64) -> Self {
         let inner_dim = dim * mult;
         let dim_out = dim_out.unwrap_or(dim);
@@ -108,6 +112,7 @@ impl CrossAttention {
     }
 }
 
+/// A basic Transformer block.
 #[derive(Debug)]
 struct BasicTransformerBlock {
     attn1: CrossAttention,
@@ -204,6 +209,7 @@ impl SpatialTransformer {
     }
 }
 
+/// Configuration for an attention block.
 #[derive(Debug, Clone, Copy)]
 pub struct AttentionBlockConfig {
     pub num_head_channels: Option<i64>,
