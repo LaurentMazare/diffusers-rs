@@ -12,7 +12,7 @@ license = "MIT/Apache-2.0"
 readme = "README.md"
 
 exclude = [
-    "examples/stable-diffusion/media/*",
+    "media/*",
 ]
 
 [dependencies]
