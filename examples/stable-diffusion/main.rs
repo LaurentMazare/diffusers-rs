@@ -52,14 +52,17 @@ const GUIDANCE_SCALE: f64 = 7.5;
 // TODO: LMSDiscreteScheduler
 // https://github.com/huggingface/diffusers/blob/32bf4fdc4386809c870528cb261028baae012d27/src/diffusers/schedulers/scheduling_lms_discrete.py#L47
 
-fn build_clip_transformer(device: Device) -> anyhow::Result<clip::ClipTextTransformer> {
+fn build_clip_transformer(
+    clip_weights: &str,
+    device: Device,
+) -> anyhow::Result<clip::ClipTextTransformer> {
     let mut vs = nn::VarStore::new(device);
     let text_model = clip::ClipTextTransformer::new(vs.root());
-    vs.load("data/pytorch_model.ot")?;
+    vs.load(clip_weights)?;
     Ok(text_model)
 }
 
-fn build_vae(device: Device) -> anyhow::Result<vae::AutoEncoderKL> {
+fn build_vae(vae_weights: &str, device: Device) -> anyhow::Result<vae::AutoEncoderKL> {
     let mut vs_ae = nn::VarStore::new(device);
     // https://huggingface.co/CompVis/stable-diffusion-v1-4/blob/main/vae/config.json
     let autoencoder_cfg = vae::AutoEncoderKLConfig {
@@ -69,11 +72,11 @@ fn build_vae(device: Device) -> anyhow::Result<vae::AutoEncoderKL> {
         norm_num_groups: 32,
     };
     let autoencoder = vae::AutoEncoderKL::new(vs_ae.root(), 3, 3, autoencoder_cfg);
-    vs_ae.load("data/vae.ot")?;
+    vs_ae.load(vae_weights)?;
     Ok(autoencoder)
 }
 
-fn build_unet(device: Device) -> anyhow::Result<unet_2d::UNet2DConditionModel> {
+fn build_unet(unet_weights: &str, device: Device) -> anyhow::Result<unet_2d::UNet2DConditionModel> {
     let mut vs_unet = nn::VarStore::new(device);
     // https://huggingface.co/CompVis/stable-diffusion-v1-4/blob/main/unet/config.json
     let unet_cfg = unet_2d::UNet2DConditionModelConfig {
@@ -95,7 +98,7 @@ fn build_unet(device: Device) -> anyhow::Result<unet_2d::UNet2DConditionModel> {
         norm_num_groups: 32,
     };
     let unet = unet_2d::UNet2DConditionModel::new(vs_unet.root(), 4, 4, unet_cfg);
-    vs_unet.load("data/unet.ot")?;
+    vs_unet.load(unet_weights)?;
     Ok(unet)
 }
 
@@ -103,12 +106,31 @@ fn build_unet(device: Device) -> anyhow::Result<unet_2d::UNet2DConditionModel> {
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// The prompt to be used for image generation.
-    #[arg(long)]
+    #[arg(
+        long,
+        default_value = "A very realistic photo of a rusty robot walking on a sandy beach"
+    )]
     prompt: Option<String>,
 
-    /// When set, use the CPU even if some CUDA devices are available.
+    /// When set, use the CPU for the UNet even if some CUDA devices are available.
     #[arg(long)]
-    cpu: bool,
+    cpu_for_unet: bool,
+
+    /// When set, use the CPU for the VAE even if some CUDA devices are available.
+    #[arg(long)]
+    cpu_for_vae: bool,
+
+    /// The UNet weight file, in .ot format.
+    #[arg(long, value_name = "FILE", default_value = "data/unet.ot")]
+    unet_weights: String,
+
+    /// The CLIP weight file, in .ot format.
+    #[arg(long, value_name = "FILE", default_value = "data/pytorch_model.ot")]
+    clip_weights: String,
+
+    /// The VAE weight file, in .ot format.
+    #[arg(long, value_name = "FILE", default_value = "data/vae.ot")]
+    vae_weights: String,
 
     /// The number of steps to run the diffusion for.
     #[arg(long, default_value_t = 30)]
@@ -119,16 +141,28 @@ struct Args {
     seed: i64,
 
     /// The name of the final image to generate.
-    #[arg(long, value_name = "FILE")]
-    final_image: Option<String>,
+    #[arg(long, value_name = "FILE", default_value = "sd_final.png")]
+    final_image: String,
 }
 
 fn main() -> anyhow::Result<()> {
-    let Args { prompt, cpu, n_steps, seed, final_image } = Args::parse();
+    let Args {
+        prompt,
+        cpu_for_unet,
+        cpu_for_vae,
+        n_steps,
+        seed,
+        final_image,
+        vae_weights,
+        clip_weights,
+        unet_weights,
+    } = Args::parse();
     tch::maybe_init_cuda();
     println!("Cuda available: {}", tch::Cuda::is_available());
     println!("Cudnn available: {}", tch::Cuda::cudnn_is_available());
-    let device = if cpu { Device::Cpu } else { Device::cuda_if_available() };
+    let clip_device = Device::Cpu;
+    let vae_device = if cpu_for_vae { Device::Cpu } else { Device::cuda_if_available() };
+    let unet_device = if cpu_for_unet { Device::Cpu } else { Device::cuda_if_available() };
     let scheduler = ddim::DDIMScheduler::new(n_steps, 1000, Default::default());
 
     let tokenizer = clip::Tokenizer::create("data/bpe_simple_vocab_16e6.txt")?;
@@ -138,27 +172,27 @@ fn main() -> anyhow::Result<()> {
     println!("Running with prompt \"{prompt}\".");
     let tokens = tokenizer.encode(&prompt)?;
     let tokens: Vec<i64> = tokens.into_iter().map(|x| x as i64).collect();
-    let tokens = Tensor::of_slice(&tokens).view((1, -1)).to(device);
+    let tokens = Tensor::of_slice(&tokens).view((1, -1)).to(clip_device);
     let uncond_tokens = tokenizer.encode("")?;
     let uncond_tokens: Vec<i64> = uncond_tokens.into_iter().map(|x| x as i64).collect();
-    let uncond_tokens = Tensor::of_slice(&uncond_tokens).view((1, -1)).to(device);
+    let uncond_tokens = Tensor::of_slice(&uncond_tokens).view((1, -1)).to(clip_device);
 
     let no_grad_guard = tch::no_grad_guard();
 
     println!("Building the Clip transformer.");
-    let text_model = build_clip_transformer(device)?;
+    let text_model = build_clip_transformer(&clip_weights, clip_device)?;
     let text_embeddings = text_model.forward(&tokens);
     let uncond_embeddings = text_model.forward(&uncond_tokens);
-    let text_embeddings = Tensor::cat(&[uncond_embeddings, text_embeddings], 0);
+    let text_embeddings = Tensor::cat(&[uncond_embeddings, text_embeddings], 0).to(unet_device);
 
     println!("Building the autoencoder.");
-    let vae = build_vae(device)?;
+    let vae = build_vae(&vae_weights, vae_device)?;
     println!("Building the unet.");
-    let unet = build_unet(device)?;
+    let unet = build_unet(&unet_weights, unet_device)?;
 
     let bsize = 1;
     tch::manual_seed(seed);
-    let mut latents = Tensor::randn(&[bsize, 4, HEIGHT / 8, WIDTH / 8], (Kind::Float, device));
+    let mut latents = Tensor::randn(&[bsize, 4, HEIGHT / 8, WIDTH / 8], (Kind::Float, unet_device));
 
     for (timestep_index, &timestep) in scheduler.timesteps().iter().enumerate() {
         println!("Timestep {timestep_index}/{n_steps}");
@@ -171,11 +205,11 @@ fn main() -> anyhow::Result<()> {
     }
 
     println!("Generating the final image.");
+    let latents = latents.to(vae_device);
     let image = vae.decode(&(&latents / 0.18215));
     let image = (image / 2 + 0.5).clamp(0., 1.).to_device(Device::Cpu);
     let image = (image * 255.).to_kind(Kind::Uint8);
-    let final_image = final_image.unwrap_or_else(|| "sd_final.png".to_string());
-    tch::vision::image::save(&image, final_image)?;
+    tch::vision::image::save(&image, &final_image)?;
 
     drop(no_grad_guard);
     Ok(())
