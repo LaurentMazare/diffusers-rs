@@ -35,14 +35,14 @@ This requires a GPU with more than 8GB of memory, as a fallback the CPU version 
 but is slower.
 
 ```bash
-cargo run --example stable-diffusion --features clap -- --prompt "A very rusty robot holding a fire torch." --cpu-for-unet --cpu-for-vae
+cargo run --example stable-diffusion --features clap -- --prompt "A very rusty robot holding a fire torch." --cpu all
 ```
 
 For a GPU with 8GB, one can use the [fp16 weights for the UNet](https://huggingface.co/CompVis/stable-diffusion-v1-4/tree/fp16/unet) and put only the UNet on the GPU.
 
 ```bash
 PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.6,max_split_size_mb:128 RUST_BACKTRACE=1 CARGO_TARGET_DIR=target2 cargo run \
-    --example stable-diffusion --features clap -- --cpu-for-vae --unet-weights data/unet-fp16.ot
+    --example stable-diffusion --features clap -- --cpu vae --cpu clip --unet-weights data/unet-fp16.ot
 ```
 
 ## Examples

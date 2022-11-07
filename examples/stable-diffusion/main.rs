@@ -117,13 +117,10 @@ struct Args {
     )]
     prompt: Option<String>,
 
-    /// When set, use the CPU for the UNet even if some CUDA devices are available.
+    /// When set, use the CPU for the listed devices, can be 'all', 'unet', 'clip', etc.
+    /// Multiple values can be set.
     #[arg(long)]
-    cpu_for_unet: bool,
-
-    /// When set, use the CPU for the VAE even if some CUDA devices are available.
-    #[arg(long)]
-    cpu_for_vae: bool,
+    cpu: Vec<String>,
 
     /// The UNet weight file, in .ot format.
     #[arg(long, value_name = "FILE", default_value = "data/unet.ot")]
@@ -157,8 +154,7 @@ struct Args {
 fn main() -> anyhow::Result<()> {
     let Args {
         prompt,
-        cpu_for_unet,
-        cpu_for_vae,
+        cpu,
         n_steps,
         seed,
         final_image,
@@ -170,9 +166,17 @@ fn main() -> anyhow::Result<()> {
     tch::maybe_init_cuda();
     println!("Cuda available: {}", tch::Cuda::is_available());
     println!("Cudnn available: {}", tch::Cuda::cudnn_is_available());
-    let clip_device = Device::cuda_if_available();
-    let vae_device = if cpu_for_vae { Device::Cpu } else { Device::cuda_if_available() };
-    let unet_device = if cpu_for_unet { Device::Cpu } else { Device::cuda_if_available() };
+    let cuda_device = Device::cuda_if_available();
+    let cpu_or_cuda = |name: &str| {
+        if cpu.iter().any(|c| c == "all" || c == name) {
+            Device::Cpu
+        } else {
+            cuda_device
+        }
+    };
+    let clip_device = cpu_or_cuda("clip");
+    let vae_device = cpu_or_cuda("vae");
+    let unet_device = cpu_or_cuda("unet");
     let scheduler = ddim::DDIMScheduler::new(n_steps, 1000, Default::default());
 
     let tokenizer = clip::Tokenizer::create("data/bpe_simple_vocab_16e6.txt")?;
