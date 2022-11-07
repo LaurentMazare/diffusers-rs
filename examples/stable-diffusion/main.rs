@@ -38,12 +38,8 @@
 //   cargo run --release --example tensor-tools cp ./data/vae.npz ./data/vae.ot
 //   cargo run --release --example tensor-tools cp ./data/unet.npz ./data/unet.ot
 use clap::Parser;
-use diffusers::{
-    models::{unet_2d, vae},
-    schedulers::ddim,
-    transformers::clip,
-};
-use tch::{nn, nn::Module, Device, Kind, Tensor};
+use diffusers::{pipelines::stable_diffusion, schedulers::ddim, transformers::clip};
+use tch::{nn::Module, Device, Kind, Tensor};
 
 const HEIGHT: i64 = 512;
 const WIDTH: i64 = 512;
@@ -51,61 +47,6 @@ const GUIDANCE_SCALE: f64 = 7.5;
 
 // TODO: LMSDiscreteScheduler
 // https://github.com/huggingface/diffusers/blob/32bf4fdc4386809c870528cb261028baae012d27/src/diffusers/schedulers/scheduling_lms_discrete.py#L47
-
-fn build_clip_transformer(
-    clip_weights: &str,
-    device: Device,
-) -> anyhow::Result<clip::ClipTextTransformer> {
-    let mut vs = nn::VarStore::new(device);
-    let text_model = clip::ClipTextTransformer::new(vs.root());
-    vs.load(clip_weights)?;
-    Ok(text_model)
-}
-
-fn build_vae(vae_weights: &str, device: Device) -> anyhow::Result<vae::AutoEncoderKL> {
-    let mut vs_ae = nn::VarStore::new(device);
-    // https://huggingface.co/CompVis/stable-diffusion-v1-4/blob/main/vae/config.json
-    let autoencoder_cfg = vae::AutoEncoderKLConfig {
-        block_out_channels: vec![128, 256, 512, 512],
-        layers_per_block: 2,
-        latent_channels: 4,
-        norm_num_groups: 32,
-    };
-    let autoencoder = vae::AutoEncoderKL::new(vs_ae.root(), 3, 3, autoencoder_cfg);
-    vs_ae.load(vae_weights)?;
-    Ok(autoencoder)
-}
-
-fn build_unet(
-    unet_weights: &str,
-    device: Device,
-    sliced_attention_size: Option<i64>,
-) -> anyhow::Result<unet_2d::UNet2DConditionModel> {
-    let mut vs_unet = nn::VarStore::new(device);
-    // https://huggingface.co/CompVis/stable-diffusion-v1-4/blob/main/unet/config.json
-    let unet_cfg = unet_2d::UNet2DConditionModelConfig {
-        attention_head_dim: 8,
-        blocks: vec![
-            unet_2d::BlockConfig { out_channels: 320, use_cross_attn: true },
-            unet_2d::BlockConfig { out_channels: 640, use_cross_attn: true },
-            unet_2d::BlockConfig { out_channels: 1280, use_cross_attn: true },
-            unet_2d::BlockConfig { out_channels: 1280, use_cross_attn: false },
-        ],
-        center_input_sample: false,
-        cross_attention_dim: 768,
-        downsample_padding: 1,
-        flip_sin_to_cos: true,
-        freq_shift: 0.,
-        layers_per_block: 2,
-        mid_block_scale_factor: 1.,
-        norm_eps: 1e-5,
-        norm_num_groups: 32,
-        sliced_attention_size,
-    };
-    let unet = unet_2d::UNet2DConditionModel::new(vs_unet.root(), 4, 4, unet_cfg);
-    vs_unet.load(unet_weights)?;
-    Ok(unet)
-}
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -194,15 +135,15 @@ fn main() -> anyhow::Result<()> {
     let no_grad_guard = tch::no_grad_guard();
 
     println!("Building the Clip transformer.");
-    let text_model = build_clip_transformer(&clip_weights, clip_device)?;
+    let text_model = stable_diffusion::build_clip_transformer(&clip_weights, clip_device)?;
     let text_embeddings = text_model.forward(&tokens);
     let uncond_embeddings = text_model.forward(&uncond_tokens);
     let text_embeddings = Tensor::cat(&[uncond_embeddings, text_embeddings], 0).to(unet_device);
 
     println!("Building the autoencoder.");
-    let vae = build_vae(&vae_weights, vae_device)?;
+    let vae = stable_diffusion::build_vae(&vae_weights, vae_device)?;
     println!("Building the unet.");
-    let unet = build_unet(&unet_weights, unet_device, sliced_attention_size)?;
+    let unet = stable_diffusion::build_unet(&unet_weights, unet_device, sliced_attention_size)?;
 
     let bsize = 1;
     tch::manual_seed(seed);
