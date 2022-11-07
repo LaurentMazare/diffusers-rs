@@ -314,7 +314,7 @@ pub struct UNetMidBlock2DCrossAttnConfig {
     // attention_type "default"
     pub output_scale_factor: f64,
     pub cross_attn_dim: i64,
-    pub sliced_attention_size: i64,
+    pub sliced_attention_size: Option<i64>,
 }
 
 impl Default for UNetMidBlock2DCrossAttnConfig {
@@ -326,7 +326,7 @@ impl Default for UNetMidBlock2DCrossAttnConfig {
             attn_num_head_channels: 1,
             output_scale_factor: 1.,
             cross_attn_dim: 1280,
-            sliced_attention_size: 0, // Sliced attention disabled
+            sliced_attention_size: None, // Sliced attention disabled
         }
     }
 }
@@ -486,12 +486,17 @@ pub struct CrossAttnDownBlock2DConfig {
     pub attn_num_head_channels: i64,
     pub cross_attention_dim: i64,
     // attention_type: "default"
-    pub sliced_attention_size: i64,
+    pub sliced_attention_size: Option<i64>,
 }
 
 impl Default for CrossAttnDownBlock2DConfig {
     fn default() -> Self {
-        Self { downblock: Default::default(), attn_num_head_channels: 1, cross_attention_dim: 1280, sliced_attention_size: 0, }
+        Self {
+            downblock: Default::default(),
+            attn_num_head_channels: 1,
+            cross_attention_dim: 1280,
+            sliced_attention_size: None,
+        }
     }
 }
 
@@ -654,12 +659,17 @@ pub struct CrossAttnUpBlock2DConfig {
     pub attn_num_head_channels: i64,
     pub cross_attention_dim: i64,
     // attention_type: "default"
-    pub sliced_attention_size: i64,
+    pub sliced_attention_size: Option<i64>,
 }
 
 impl Default for CrossAttnUpBlock2DConfig {
     fn default() -> Self {
-        Self { upblock: Default::default(), attn_num_head_channels: 1, cross_attention_dim: 1280, sliced_attention_size: 0, }
+        Self {
+            upblock: Default::default(),
+            attn_num_head_channels: 1,
+            cross_attention_dim: 1280,
+            sliced_attention_size: None,
+        }
     }
 }
 

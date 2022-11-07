@@ -76,7 +76,11 @@ fn build_vae(vae_weights: &str, device: Device) -> anyhow::Result<vae::AutoEncod
     Ok(autoencoder)
 }
 
-fn build_unet(unet_weights: &str, device: Device, sliced_attention_size: i64) -> anyhow::Result<unet_2d::UNet2DConditionModel> {
+fn build_unet(
+    unet_weights: &str,
+    device: Device,
+    sliced_attention_size: Option<i64>,
+) -> anyhow::Result<unet_2d::UNet2DConditionModel> {
     let mut vs_unet = nn::VarStore::new(device);
     // https://huggingface.co/CompVis/stable-diffusion-v1-4/blob/main/unet/config.json
     let unet_cfg = unet_2d::UNet2DConditionModelConfig {
@@ -134,8 +138,8 @@ struct Args {
     vae_weights: String,
 
     /// The size of the sliced attention or 0 to disable slicing (default)
-    #[arg(long, default_value_t = 0)]
-    sliced_attention_size: i64,
+    #[arg(long)]
+    sliced_attention_size: Option<i64>,
 
     /// The number of steps to run the diffusion for.
     #[arg(long, default_value_t = 30)]

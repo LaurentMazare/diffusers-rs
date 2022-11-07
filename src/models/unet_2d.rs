@@ -25,7 +25,7 @@ pub struct UNet2DConditionModelConfig {
     pub norm_eps: f64,
     pub cross_attention_dim: i64,
     pub attention_head_dim: i64,
-    pub sliced_attention_size: i64,
+    pub sliced_attention_size: Option<i64>,
 }
 
 impl Default for UNet2DConditionModelConfig {
@@ -47,7 +47,7 @@ impl Default for UNet2DConditionModelConfig {
             norm_eps: 1e-5,
             cross_attention_dim: 1280,
             attention_head_dim: 8,
-            sliced_attention_size: 0,
+            sliced_attention_size: None,
         }
     }
 }

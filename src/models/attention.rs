@@ -1,5 +1,5 @@
 //! Attention Based Building Blocks
-use tch::{nn, nn::Module, Kind, Tensor, IndexOp};
+use tch::{nn, nn::Module, IndexOp, Kind, Tensor};
 #[derive(Debug)]
 struct GeGlu {
     proj: nn::Linear,
@@ -55,7 +55,7 @@ struct CrossAttention {
     to_out: nn::Linear,
     heads: i64,
     scale: f64,
-    slice_size: i64,
+    slice_size: Option<i64>,
 }
 
 impl CrossAttention {
@@ -66,7 +66,7 @@ impl CrossAttention {
         context_dim: Option<i64>,
         heads: i64,
         dim_head: i64,
-        slice_size: i64,
+        slice_size: Option<i64>,
     ) -> Self {
         let no_bias = nn::LinearConfig { bias: false, ..Default::default() };
         let inner_dim = dim_head * heads;
@@ -93,21 +93,33 @@ impl CrossAttention {
             .reshape(&[batch_size / self.heads, seq_len, dim * self.heads])
     }
 
-    fn sliced_attention(&self, query: &Tensor, key: &Tensor, value: &Tensor, sequence_length: i64, dim: i64, slice_size: i64) -> Tensor {
+    fn sliced_attention(
+        &self,
+        query: &Tensor,
+        key: &Tensor,
+        value: &Tensor,
+        sequence_length: i64,
+        dim: i64,
+        slice_size: i64,
+    ) -> Tensor {
         let batch_size_attention = query.size()[0];
-        let mut hidden_states = Tensor::zeros(&[batch_size_attention, sequence_length, dim / self.heads], (query.kind(), query.device()));
+        let mut hidden_states = Tensor::zeros(
+            &[batch_size_attention, sequence_length, dim / self.heads],
+            (query.kind(), query.device()),
+        );
 
         for i in 0..batch_size_attention / slice_size {
             let start_idx = i * slice_size;
             let end_idx = (i + 1) * slice_size;
 
-            let xs = query.i(start_idx..end_idx)
+            let xs = query
+                .i(start_idx..end_idx)
                 .matmul(&(key.i(start_idx..end_idx).transpose(-1, -2) * self.scale))
                 .softmax(-1, Kind::Float)
                 .matmul(&value.i(start_idx..end_idx));
 
             let idx = Tensor::arange_start(start_idx, end_idx, (Kind::Int64, query.device()));
-            hidden_states.index_put_(&[Some(idx), None, None], &xs, false);
+            let _ = hidden_states.index_put_(&[Some(idx), None, None], &xs, false);
         }
 
         self.reshape_batch_dim_to_heads(&hidden_states)
@@ -131,12 +143,17 @@ impl CrossAttention {
         let query = self.reshape_heads_to_batch_dim(&query);
         let key = self.reshape_heads_to_batch_dim(&key);
         let value = self.reshape_heads_to_batch_dim(&value);
-        if self.slice_size == 0 || (query.size()[0] / self.slice_size) == 1 {
-            self.attention(&query, &key, &value).apply(&self.to_out)
-        } else {
-            self.sliced_attention(&query, &key, &value, sequence_length, dim, self.slice_size).apply(&self.to_out)
+        match self.slice_size {
+            None => self.attention(&query, &key, &value).apply(&self.to_out),
+            Some(slice_size) => {
+                if query.size()[0] / slice_size <= 1 {
+                    self.attention(&query, &key, &value).apply(&self.to_out)
+                } else {
+                    self.sliced_attention(&query, &key, &value, sequence_length, dim, slice_size)
+                        .apply(&self.to_out)
+                }
+            }
         }
-        
     }
 }
 
@@ -152,10 +169,25 @@ struct BasicTransformerBlock {
 }
 
 impl BasicTransformerBlock {
-    fn new(vs: nn::Path, dim: i64, n_heads: i64, d_head: i64, context_dim: Option<i64>, sliced_attention_size: i64) -> Self {
-        let attn1 = CrossAttention::new(&vs / "attn1", dim, None, n_heads, d_head, sliced_attention_size);
+    fn new(
+        vs: nn::Path,
+        dim: i64,
+        n_heads: i64,
+        d_head: i64,
+        context_dim: Option<i64>,
+        sliced_attention_size: Option<i64>,
+    ) -> Self {
+        let attn1 =
+            CrossAttention::new(&vs / "attn1", dim, None, n_heads, d_head, sliced_attention_size);
         let ff = FeedForward::new(&vs / "ff", dim, None, 4);
-        let attn2 = CrossAttention::new(&vs / "attn2", dim, context_dim, n_heads, d_head, sliced_attention_size);
+        let attn2 = CrossAttention::new(
+            &vs / "attn2",
+            dim,
+            context_dim,
+            n_heads,
+            d_head,
+            sliced_attention_size,
+        );
         let norm1 = nn::layer_norm(&vs / "norm1", vec![dim], Default::default());
         let norm2 = nn::layer_norm(&vs / "norm2", vec![dim], Default::default());
         let norm3 = nn::layer_norm(&vs / "norm3", vec![dim], Default::default());
@@ -174,12 +206,12 @@ pub struct SpatialTransformerConfig {
     pub depth: i64,
     pub num_groups: i64,
     pub context_dim: Option<i64>,
-    pub sliced_attention_size: i64,
+    pub sliced_attention_size: Option<i64>,
 }
 
 impl Default for SpatialTransformerConfig {
     fn default() -> Self {
-        Self { depth: 1, num_groups: 32, context_dim: None, sliced_attention_size: 0 }
+        Self { depth: 1, num_groups: 32, context_dim: None, sliced_attention_size: None }
     }
 }
 
