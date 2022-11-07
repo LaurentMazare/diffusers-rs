@@ -1,0 +1,28 @@
+Download the models from here
+https://huggingface.co/runwayml/stable-diffusion-v1-5/tree/main (normal full)
+https://huggingface.co/runwayml/stable-diffusion-v1-5/tree/fp16 (normal half)
+https://huggingface.co/runwayml/stable-diffusion-inpainting/tree/main (inpainting full)
+https://huggingface.co/runwayml/stable-diffusion-inpainting/tree/fp16 (inpainiting half)
+
+
+If you need to convert models, use an anaconda powershell promt and the diffusers env.
+Then move to the diffusers-rs dir and set the LIBTORCH to the libtorch dir (uncompressed from libtorch-win-shared-with-deps-1.13.0+cu117.zip).
+
+conda activate diffusers
+
+cd C:\Users\Siriux\Workspace\External\diffusers-rs
+
+$Env:LIBTORCH = "C:\Users\Siriux\Workspace\External\libtorch"
+$Env:Path += ";C:\Users\Siriux\Workspace\External\libtorch\lib"
+
+___________
+
+To convert the models first use: python convert_to_npz.py
+Then:
+cargo run --example tensor-tools cp ./data/clip.npz ./data/clip.ot
+cargo run --example tensor-tools cp ./data/vae_v1_5.npz ./data/vae_v1_5.ot
+cargo run --example tensor-tools cp ./data/unet_v1_5.npz ./data/unet_v1_5.ot
+
+cargo run --example tensor-tools cp ./data/clip_v1_5_fp16.npz ./data/clip_v1_5_fp16.ot
+cargo run --example tensor-tools cp ./data/vae_v1_5_fp16.npz ./data/vae_v1_5_fp16.ot
+cargo run --example tensor-tools cp ./data/unet_v1_5_fp16.npz ./data/unet_v1_5_fp16.ot

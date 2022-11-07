@@ -314,6 +314,7 @@ pub struct UNetMidBlock2DCrossAttnConfig {
     // attention_type "default"
     pub output_scale_factor: f64,
     pub cross_attn_dim: i64,
+    pub sliced_attention_size: i64,
 }
 
 impl Default for UNetMidBlock2DCrossAttnConfig {
@@ -325,6 +326,7 @@ impl Default for UNetMidBlock2DCrossAttnConfig {
             attn_num_head_channels: 1,
             output_scale_factor: 1.,
             cross_attn_dim: 1280,
+            sliced_attention_size: 0, // Sliced attention disabled
         }
     }
 }
@@ -359,6 +361,7 @@ impl UNetMidBlock2DCrossAttn {
             depth: 1,
             num_groups: resnet_groups,
             context_dim: Some(config.cross_attn_dim),
+            sliced_attention_size: config.sliced_attention_size,
         };
         let mut attn_resnets = vec![];
         for index in 0..config.num_layers {
@@ -483,11 +486,12 @@ pub struct CrossAttnDownBlock2DConfig {
     pub attn_num_head_channels: i64,
     pub cross_attention_dim: i64,
     // attention_type: "default"
+    pub sliced_attention_size: i64,
 }
 
 impl Default for CrossAttnDownBlock2DConfig {
     fn default() -> Self {
-        Self { downblock: Default::default(), attn_num_head_channels: 1, cross_attention_dim: 1280 }
+        Self { downblock: Default::default(), attn_num_head_channels: 1, cross_attention_dim: 1280, sliced_attention_size: 0, }
     }
 }
 
@@ -518,6 +522,7 @@ impl CrossAttnDownBlock2D {
             depth: 1,
             context_dim: Some(config.cross_attention_dim),
             num_groups: config.downblock.resnet_groups,
+            sliced_attention_size: config.sliced_attention_size,
         };
         let vs_attn = &vs / "attentions";
         let attentions = (0..config.downblock.num_layers)
@@ -649,11 +654,12 @@ pub struct CrossAttnUpBlock2DConfig {
     pub attn_num_head_channels: i64,
     pub cross_attention_dim: i64,
     // attention_type: "default"
+    pub sliced_attention_size: i64,
 }
 
 impl Default for CrossAttnUpBlock2DConfig {
     fn default() -> Self {
-        Self { upblock: Default::default(), attn_num_head_channels: 1, cross_attention_dim: 1280 }
+        Self { upblock: Default::default(), attn_num_head_channels: 1, cross_attention_dim: 1280, sliced_attention_size: 0, }
     }
 }
 
@@ -686,6 +692,7 @@ impl CrossAttnUpBlock2D {
             depth: 1,
             context_dim: Some(config.cross_attention_dim),
             num_groups: config.upblock.resnet_groups,
+            sliced_attention_size: config.sliced_attention_size,
         };
         let vs_attn = &vs / "attentions";
         let attentions = (0..config.upblock.num_layers)

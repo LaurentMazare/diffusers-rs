@@ -76,7 +76,7 @@ fn build_vae(vae_weights: &str, device: Device) -> anyhow::Result<vae::AutoEncod
     Ok(autoencoder)
 }
 
-fn build_unet(unet_weights: &str, device: Device) -> anyhow::Result<unet_2d::UNet2DConditionModel> {
+fn build_unet(unet_weights: &str, device: Device, sliced_attention_size: i64) -> anyhow::Result<unet_2d::UNet2DConditionModel> {
     let mut vs_unet = nn::VarStore::new(device);
     // https://huggingface.co/CompVis/stable-diffusion-v1-4/blob/main/unet/config.json
     let unet_cfg = unet_2d::UNet2DConditionModelConfig {
@@ -96,6 +96,7 @@ fn build_unet(unet_weights: &str, device: Device) -> anyhow::Result<unet_2d::UNe
         mid_block_scale_factor: 1.,
         norm_eps: 1e-5,
         norm_num_groups: 32,
+        sliced_attention_size,
     };
     let unet = unet_2d::UNet2DConditionModel::new(vs_unet.root(), 4, 4, unet_cfg);
     vs_unet.load(unet_weights)?;
@@ -132,6 +133,10 @@ struct Args {
     #[arg(long, value_name = "FILE", default_value = "data/vae.ot")]
     vae_weights: String,
 
+    /// The size of the sliced attention or 0 to disable slicing (default)
+    #[arg(long, default_value_t = 0)]
+    sliced_attention_size: i64,
+
     /// The number of steps to run the diffusion for.
     #[arg(long, default_value_t = 30)]
     n_steps: usize,
@@ -156,11 +161,12 @@ fn main() -> anyhow::Result<()> {
         vae_weights,
         clip_weights,
         unet_weights,
+        sliced_attention_size,
     } = Args::parse();
     tch::maybe_init_cuda();
     println!("Cuda available: {}", tch::Cuda::is_available());
     println!("Cudnn available: {}", tch::Cuda::cudnn_is_available());
-    let clip_device = Device::Cpu;
+    let clip_device = Device::cuda_if_available();
     let vae_device = if cpu_for_vae { Device::Cpu } else { Device::cuda_if_available() };
     let unet_device = if cpu_for_unet { Device::Cpu } else { Device::cuda_if_available() };
     let scheduler = ddim::DDIMScheduler::new(n_steps, 1000, Default::default());
@@ -188,7 +194,7 @@ fn main() -> anyhow::Result<()> {
     println!("Building the autoencoder.");
     let vae = build_vae(&vae_weights, vae_device)?;
     println!("Building the unet.");
-    let unet = build_unet(&unet_weights, unet_device)?;
+    let unet = build_unet(&unet_weights, unet_device, sliced_attention_size)?;
 
     let bsize = 1;
     tch::manual_seed(seed);

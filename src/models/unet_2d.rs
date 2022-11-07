@@ -25,6 +25,7 @@ pub struct UNet2DConditionModelConfig {
     pub norm_eps: f64,
     pub cross_attention_dim: i64,
     pub attention_head_dim: i64,
+    pub sliced_attention_size: i64,
 }
 
 impl Default for UNet2DConditionModelConfig {
@@ -46,6 +47,7 @@ impl Default for UNet2DConditionModelConfig {
             norm_eps: 1e-5,
             cross_attention_dim: 1280,
             attention_head_dim: 8,
+            sliced_attention_size: 0,
         }
     }
 }
@@ -113,6 +115,7 @@ impl UNet2DConditionModel {
                         downblock: db_cfg,
                         attn_num_head_channels: config.attention_head_dim,
                         cross_attention_dim: config.cross_attention_dim,
+                        sliced_attention_size: config.sliced_attention_size,
                     };
                     let block = CrossAttnDownBlock2D::new(
                         &vs_db / i,
@@ -172,6 +175,7 @@ impl UNet2DConditionModel {
                         upblock: ub_cfg,
                         attn_num_head_channels: config.attention_head_dim,
                         cross_attention_dim: config.cross_attention_dim,
+                        sliced_attention_size: config.sliced_attention_size,
                     };
                     let block = CrossAttnUpBlock2D::new(
                         &vs_ub / i,
