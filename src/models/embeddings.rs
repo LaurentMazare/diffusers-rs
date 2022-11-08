@@ -44,7 +44,7 @@ impl Timesteps {
 impl Module for Timesteps {
     fn forward(&self, xs: &Tensor) -> Tensor {
         let half_dim = self.num_channels / 2;
-        let exponent = Tensor::arange(half_dim, (Kind::Float, self.device)) * -f64::ln(10000.);
+        let exponent = Tensor::arange(half_dim, (Kind::Half, self.device)) * -f64::ln(10000.);
         let exponent = exponent / (half_dim as f64 - self.downscale_freq_shift);
         let emb = exponent.exp();
         // emb = timesteps[:, None].float() * emb[None, :]

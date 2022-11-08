@@ -115,7 +115,7 @@ impl CrossAttention {
             let xs = query
                 .i(start_idx..end_idx)
                 .matmul(&(key.i(start_idx..end_idx).transpose(-1, -2) * self.scale))
-                .softmax(-1, Kind::Float)
+                .softmax(-1, Kind::Half)
                 .matmul(&value.i(start_idx..end_idx));
 
             let idx = Tensor::arange_start(start_idx, end_idx, (Kind::Int64, query.device()));
@@ -128,7 +128,7 @@ impl CrossAttention {
     fn attention(&self, query: &Tensor, key: &Tensor, value: &Tensor) -> Tensor {
         let xs = query
             .matmul(&(key.transpose(-1, -2) * self.scale))
-            .softmax(-1, Kind::Float)
+            .softmax(-1, Kind::Half)
             .matmul(value);
         self.reshape_batch_dim_to_heads(&xs)
     }
@@ -334,7 +334,7 @@ impl Module for AttentionBlock {
         let scale = f64::powf((self.channels as f64) / (self.num_heads as f64), -0.25);
         let attention_scores =
             (query_states * scale).matmul(&(key_states.transpose(-1, -2) * scale));
-        let attention_probs = attention_scores.softmax(-1, Kind::Float);
+        let attention_probs = attention_scores.softmax(-1, Kind::Half);
 
         let xs = attention_probs.matmul(&value_states);
         let xs = xs.permute(&[0, 2, 1, 3]).contiguous();

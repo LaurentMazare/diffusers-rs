@@ -7,7 +7,9 @@
 //!
 //! Denoising Diffusion Implicit Models, J. Song et al, 2020.
 //! https://arxiv.org/abs/2010.02502
-use tch::{kind, Kind, Tensor};
+use std::ops::Add;
+
+use tch::{kind, Kind, Tensor, IndexOp};
 
 /// This represents how beta ranges from its minimum value to the maximum
 /// during training.
@@ -114,4 +116,16 @@ impl DDIMScheduler {
             prev_sample
         }
     }
+
+    pub fn add_noise(&self, original_samples: &Tensor, noise: &Tensor, timesteps: &Tensor) -> Tensor {
+        let alphas_cumprod = Tensor::of_slice(&self.alphas_cumprod).to_device(original_samples.device()).to_kind(original_samples.kind());
+        let timesteps = timesteps.to_device(original_samples.device());
+        let alphas_cumprod_timesteps = alphas_cumprod.i(&timesteps);
+        
+        let sqrt_alpha_prod = alphas_cumprod_timesteps.sqrt();
+        let sqrt_one_minus_alpha_prod = alphas_cumprod_timesteps.neg().add(1).sqrt();
+
+        sqrt_alpha_prod * original_samples + sqrt_one_minus_alpha_prod * noise
+    }
+
 }

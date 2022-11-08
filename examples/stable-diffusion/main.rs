@@ -147,7 +147,7 @@ fn main() -> anyhow::Result<()> {
 
     let bsize = 1;
     tch::manual_seed(seed);
-    let mut latents = Tensor::randn(&[bsize, 4, HEIGHT / 8, WIDTH / 8], (Kind::Float, unet_device));
+    let mut latents = Tensor::randn(&[bsize, 4, HEIGHT / 8, WIDTH / 8], (Kind::Half, unet_device));
 
     for (timestep_index, &timestep) in scheduler.timesteps().iter().enumerate() {
         println!("Timestep {timestep_index}/{n_steps}");

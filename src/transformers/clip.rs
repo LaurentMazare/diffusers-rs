@@ -500,7 +500,7 @@ impl ClipAttention {
         let attn_weights =
             attn_weights.view((bsz, NUM_ATTENTION_HEADS, tgt_len, src_len)) + causal_attention_mask;
         let attn_weights = attn_weights.view((bsz * NUM_ATTENTION_HEADS, tgt_len, src_len));
-        let attn_weights = attn_weights.softmax(-1, Kind::Float);
+        let attn_weights = attn_weights.softmax(-1, Kind::Half);
 
         let attn_output = attn_weights.bmm(&value_states);
         attn_output
@@ -608,7 +608,7 @@ impl ClipTextTransformer {
     // https://github.com/huggingface/transformers/blob/674f750a57431222fa2832503a108df3badf1564/src/transformers/models/clip/modeling_clip.py#L678
     fn build_causal_attention_mask(bsz: i64, seq_len: i64, device: Device) -> Tensor {
         let mut mask = Tensor::ones(&[bsz, seq_len, seq_len], (Kind::Float, device));
-        mask.fill_(f32::MIN as f64).triu_(1).unsqueeze(1)
+        mask.fill_(f32::MIN as f64).triu_(1).unsqueeze(1).to_kind(Kind::Half)
     }
 }
 

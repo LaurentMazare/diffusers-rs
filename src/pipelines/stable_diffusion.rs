@@ -11,6 +11,7 @@ pub fn build_clip_transformer(
     let mut vs = nn::VarStore::new(device);
     let text_model = clip::ClipTextTransformer::new(vs.root());
     vs.load(clip_weights)?;
+    vs.half();
     Ok(text_model)
 }
 
@@ -25,6 +26,7 @@ pub fn build_vae(vae_weights: &str, device: Device) -> anyhow::Result<vae::AutoE
     };
     let autoencoder = vae::AutoEncoderKL::new(vs_ae.root(), 3, 3, autoencoder_cfg);
     vs_ae.load(vae_weights)?;
+    vs_ae.half();
     Ok(autoencoder)
 }
 
@@ -56,5 +58,6 @@ pub fn build_unet(
     };
     let unet = unet_2d::UNet2DConditionModel::new(vs_unet.root(), 4, 4, unet_cfg);
     vs_unet.load(unet_weights)?;
+    vs_unet.half();
     Ok(unet)
 }
