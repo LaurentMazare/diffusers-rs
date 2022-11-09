@@ -39,8 +39,7 @@ np.savez('./unet.npz', **{k: v.numpy() for k, v in model.items()})
 }
 
 tch_tools_to_ot() {
-  cd $ROOT/tch-rs
-  cargo run --release --example tensor-tools cp ../data/$1.npz ../data/$1.ot
+  cargo run --release --example tensor-tools cp $ROOT/data/$1.npz $ROOT/data/$1.ot
 }
 
 
@@ -51,7 +50,6 @@ fi
 
 echo "Setting up for diffusers-rs..."
 
-git clone https://github.com/LaurentMazare/tch-rs
 mkdir -p data
 cd data
 
@@ -68,7 +66,6 @@ tch_tools_to_ot vae
 tch_tools_to_ot unet 
 
 echo "Cleaning ..."
-rm -rf $ROOT/tch-rs
 rm -rf $ROOT/data/*.npz $ROOT/data/*.bin
 
 echo "Done."
