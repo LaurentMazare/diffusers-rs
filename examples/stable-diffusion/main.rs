@@ -25,8 +25,8 @@
 //   cargo run --release --example tensor-tools cp ./data/pytorch_model.npz ./data/pytorch_model.ot
 //
 // 2. VAE and Unet Weights
-// https://huggingface.co/CompVis/stable-diffusion-v1-4/blob/main/vae/diffusion_pytorch_model.bin
-// https://huggingface.co/CompVis/stable-diffusion-v1-4/blob/main/unet/diffusion_pytorch_model.bin
+// https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/vae/diffusion_pytorch_model.bin
+// https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/unet/diffusion_pytorch_model.bin
 //
 //   import numpy as np
 //   import torch

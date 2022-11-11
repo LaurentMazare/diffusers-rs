@@ -16,7 +16,7 @@ pub fn build_clip_transformer(
 
 pub fn build_vae(vae_weights: &str, device: Device) -> anyhow::Result<vae::AutoEncoderKL> {
     let mut vs_ae = nn::VarStore::new(device);
-    // https://huggingface.co/CompVis/stable-diffusion-v1-4/blob/main/vae/config.json
+    // https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/vae/config.json
     let autoencoder_cfg = vae::AutoEncoderKLConfig {
         block_out_channels: vec![128, 256, 512, 512],
         layers_per_block: 2,
@@ -34,7 +34,7 @@ pub fn build_unet(
     sliced_attention_size: Option<i64>,
 ) -> anyhow::Result<unet_2d::UNet2DConditionModel> {
     let mut vs_unet = nn::VarStore::new(device);
-    // https://huggingface.co/CompVis/stable-diffusion-v1-4/blob/main/unet/config.json
+    // https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/unet/config.json
     let unet_cfg = unet_2d::UNet2DConditionModelConfig {
         attention_head_dim: 8,
         blocks: vec![

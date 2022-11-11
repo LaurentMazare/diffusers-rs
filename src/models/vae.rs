@@ -210,8 +210,8 @@ impl Default for AutoEncoderKLConfig {
 }
 
 // https://github.com/huggingface/diffusers/blob/970e30606c2944e3286f56e8eb6d3dc6d1eb85f7/src/diffusers/models/vae.py#L485
-// This implementation is specific to the config used in stable-diffusion-v1-4
-// https://huggingface.co/CompVis/stable-diffusion-v1-4/blob/main/vae/config.json
+// This implementation is specific to the config used in stable-diffusion-v1-5
+// https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/vae/config.json
 #[derive(Debug)]
 pub struct AutoEncoderKL {
     encoder: Encoder,

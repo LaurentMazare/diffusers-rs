@@ -14,7 +14,7 @@ The `diffusers` crate is a Rust equivalent to Huggingface's amazing
 [diffusers](https://github.com/huggingface/diffusers) Python library.
 It is based on the [tch crate](https://github.com/LaurentMazare/tch-rs/).
 The implementation is complete enough so as to be able to run Stable Diffusion
-v1.4.
+v1.5.
 
 In order to run the models, one has to get the weights, see the details below and can then run
 the following command. At each step, some `sd_*.png` image is generated, the last one `sd_30.png`
@@ -38,7 +38,7 @@ but is slower.
 cargo run --example stable-diffusion --features clap -- --prompt "A very rusty robot holding a fire torch." --cpu all
 ```
 
-For a GPU with 8GB, one can use the [fp16 weights for the UNet](https://huggingface.co/CompVis/stable-diffusion-v1-4/tree/fp16/unet) and put only the UNet on the GPU.
+For a GPU with 8GB, one can use the [fp16 weights for the UNet](https://huggingface.co/runwayml/stable-diffusion-v1-5/tree/fp16/unet) and put only the UNet on the GPU.
 
 ```bash
 PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.6,max_split_size_mb:128 RUST_BACKTRACE=1 CARGO_TARGET_DIR=target2 cargo run \
@@ -100,7 +100,7 @@ cargo run --release --example tensor-tools cp ./data/pytorch_model.npz ./data/py
 
 ### VAE and Unet Weights
 
-The weight files can be downloaded from huggingface's hub but it first requires you to log in (and to [accept the terms of use](https://huggingface.co/CompVis/stable-diffusion-v1-4) the first time). Then you can download the [VAE weights](https://huggingface.co/CompVis/stable-diffusion-v1-4/blob/main/vae/diffusion_pytorch_model.bin) and [Unet weights](https://huggingface.co/CompVis/stable-diffusion-v1-4/blob/main/unet/diffusion_pytorch_model.bin).
+The weight files can be downloaded from huggingface's hub but it first requires you to log in (and to [accept the terms of use](https://huggingface.co/runwayml/stable-diffusion-v1-5) the first time). Then you can download the [VAE weights](https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/vae/diffusion_pytorch_model.bin) and [Unet weights](https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/unet/diffusion_pytorch_model.bin).
 
 After downloading the files, use Python to convert them to `npz` files.
 
