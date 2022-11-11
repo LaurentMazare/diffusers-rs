@@ -1,6 +1,10 @@
-#!/bin/sh
+#!/bin/bash
+set -euxo pipefail
 
 ROOT=$(pwd)
+
+# This can be either fp16 or main for float32 weights.
+BRANCH=fp16
 
 wget_vocab() {
    wget https://github.com/openai/CLIP/raw/main/clip/bpe_simple_vocab_16e6.txt.gz
@@ -9,7 +13,7 @@ wget_vocab() {
 
 wget_clip_weights() {
   wget -c https://huggingface.co/openai/clip-vit-large-patch14/resolve/main/pytorch_model.bin
-  python3 -c "
+  LD_LIBRARY_PATH= python3 -c "
 import numpy as np
 import torch
 
@@ -21,12 +25,12 @@ np.savez('./pytorch_model.npz', **{k: v.numpy() for k, v in model.items() if 'te
 wget_vae_unet_weights() {
   # download weights for vae
   header="Authorization: Bearer $1"
-  wget --header="$header" https://huggingface.co/CompVis/stable-diffusion-v1-4/resolve/main/vae/diffusion_pytorch_model.bin -O vae.bin
+  wget --header="$header" https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/$BRANCH/vae/diffusion_pytorch_model.bin -O vae.bin
   # download weights for unet
-  wget --header="$header" https://huggingface.co/CompVis/stable-diffusion-v1-4/resolve/main/unet/diffusion_pytorch_model.bin -O unet.bin	
+  wget --header="$header" https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/$BRANCH/unet/diffusion_pytorch_model.bin -O unet.bin	
   
   # convert to npz
-  python3 -c "
+  LD_LIBRARY_PATH= python3 -c "
 import numpy as np
 import torch
   

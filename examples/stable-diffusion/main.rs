@@ -87,6 +87,10 @@ struct Args {
     #[arg(long, default_value_t = 32)]
     seed: i64,
 
+    /// The number of samples to generate.
+    #[arg(long, default_value_t = 1)]
+    num_samples: i64,
+
     /// The name of the final image to generate.
     #[arg(long, value_name = "FILE", default_value = "sd_final.png")]
     final_image: String,
@@ -103,6 +107,7 @@ fn main() -> anyhow::Result<()> {
         clip_weights,
         unet_weights,
         sliced_attention_size,
+        num_samples,
     } = Args::parse();
     tch::maybe_init_cuda();
     println!("Cuda available: {}", tch::Cuda::is_available());
@@ -146,25 +151,39 @@ fn main() -> anyhow::Result<()> {
     let unet = stable_diffusion::build_unet(&unet_weights, unet_device, sliced_attention_size)?;
 
     let bsize = 1;
-    tch::manual_seed(seed);
-    let mut latents = Tensor::randn(&[bsize, 4, HEIGHT / 8, WIDTH / 8], (Kind::Float, unet_device));
+    for idx in 0..num_samples {
+        tch::manual_seed(seed + idx);
+        let mut latents =
+            Tensor::randn(&[bsize, 4, HEIGHT / 8, WIDTH / 8], (Kind::Float, unet_device));
 
-    for (timestep_index, &timestep) in scheduler.timesteps().iter().enumerate() {
-        println!("Timestep {timestep_index}/{n_steps}");
-        let latent_model_input = Tensor::cat(&[&latents, &latents], 0);
-        let noise_pred = unet.forward(&latent_model_input, timestep as f64, &text_embeddings);
-        let noise_pred = noise_pred.chunk(2, 0);
-        let (noise_pred_uncond, noise_pred_text) = (&noise_pred[0], &noise_pred[1]);
-        let noise_pred = noise_pred_uncond + (noise_pred_text - noise_pred_uncond) * GUIDANCE_SCALE;
-        latents = scheduler.step(&noise_pred, timestep, &latents);
+        for (timestep_index, &timestep) in scheduler.timesteps().iter().enumerate() {
+            println!("Timestep {timestep_index}/{n_steps}");
+            let latent_model_input = Tensor::cat(&[&latents, &latents], 0);
+            let noise_pred = unet.forward(&latent_model_input, timestep as f64, &text_embeddings);
+            let noise_pred = noise_pred.chunk(2, 0);
+            let (noise_pred_uncond, noise_pred_text) = (&noise_pred[0], &noise_pred[1]);
+            let noise_pred =
+                noise_pred_uncond + (noise_pred_text - noise_pred_uncond) * GUIDANCE_SCALE;
+            latents = scheduler.step(&noise_pred, timestep, &latents);
+        }
+
+        println!("Generating the final image for sample {}/{}.", idx + 1, num_samples);
+        let latents = latents.to(vae_device);
+        let image = vae.decode(&(&latents / 0.18215));
+        let image = (image / 2 + 0.5).clamp(0., 1.).to_device(Device::Cpu);
+        let image = (image * 255.).to_kind(Kind::Uint8);
+        let final_image = if num_samples > 1 {
+            match final_image.rsplit_once('.') {
+                None => format!("{}.{}.png", final_image, idx + 1),
+                Some((filename_no_extension, extension)) => {
+                    format!("{}.{}.{}", filename_no_extension, idx + 1, extension)
+                }
+            }
+        } else {
+            final_image.clone()
+        };
+        tch::vision::image::save(&image, &final_image)?;
     }
-
-    println!("Generating the final image.");
-    let latents = latents.to(vae_device);
-    let image = vae.decode(&(&latents / 0.18215));
-    let image = (image / 2 + 0.5).clamp(0., 1.).to_device(Device::Cpu);
-    let image = (image * 255.).to_kind(Kind::Uint8);
-    tch::vision::image::save(&image, &final_image)?;
 
     drop(no_grad_guard);
     Ok(())
