@@ -27,6 +27,10 @@ clap = { version = "4.0.19", optional = true, features = ["derive"] }
 name = "stable-diffusion"
 required-features = ["clap"]
 
+[[example]]
+name = "stable-diffusion-img2img"
+required-features = ["clap"]
+
 [features]
 doc-only = ["tch/doc-only"]
 
