@@ -209,6 +209,28 @@ impl Default for AutoEncoderKLConfig {
     }
 }
 
+pub struct DiagonalGaussianDistribution {
+    mean: Tensor,
+    std: Tensor,
+    device: tch::Device,
+}
+
+impl DiagonalGaussianDistribution {
+    pub fn new(parameters: &Tensor) -> Self {
+        let mut parameters = parameters.chunk(2, 1).into_iter();
+        let mean = parameters.next().unwrap();
+        let logvar = parameters.next().unwrap();
+        let std = (logvar * 0.5).exp();
+        let device = std.device();
+        DiagonalGaussianDistribution { mean, std, device }
+    }
+
+    pub fn sample(&self) -> Tensor {
+        let sample = Tensor::randn_like(&self.mean).to(self.device);
+        &self.mean + &self.std * sample
+    }
+}
+
 // https://github.com/huggingface/diffusers/blob/970e30606c2944e3286f56e8eb6d3dc6d1eb85f7/src/diffusers/models/vae.py#L485
 // This implementation is specific to the config used in stable-diffusion-v1-5
 // https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/vae/config.json
@@ -250,9 +272,10 @@ impl AutoEncoderKL {
         Self { encoder, decoder, quant_conv, post_quant_conv, config }
     }
 
-    // Returns the parameters of the latent distribution.
-    pub fn encode(&self, xs: &Tensor) -> Tensor {
-        xs.apply(&self.encoder).apply(&self.quant_conv)
+    /// Returns the distribution in the latent space.
+    pub fn encode(&self, xs: &Tensor) -> DiagonalGaussianDistribution {
+        let parameters = xs.apply(&self.encoder).apply(&self.quant_conv);
+        DiagonalGaussianDistribution::new(&parameters)
     }
 
     /// Takes as input some sampled values.
