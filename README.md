@@ -56,6 +56,21 @@ A bunch of rusty robots holding some torches!
 ![rusty robot holding a torch](media/robot11.jpg)
 ![rusty robot holding a torch](media/robot13.jpg)
 
+## Image to Image Pipeline
+
+The stable diffusion model can also be used to generate an image based on
+another image. The following command runs this image to image pipeline:
+
+```bash
+cargo run --example stable-diffusion-img2img --features clap -- --input-image media/in_img2img.jpg
+```
+
+The default prompt is "A fantasy landscape, trending on artstation.", but can
+be changed via the `-prompt` flag.
+
+![img2img input](media/in_img2img.jpg)
+![img2img output](media/out_img2img.jpg)
+
 ## Getting the Weights and Vocab File
 
 In order to run this, the weights have to be downloaded, converted to the appropriate
