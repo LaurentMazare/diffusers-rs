@@ -67,6 +67,10 @@ struct Args {
     /// The name of the final image to generate.
     #[arg(long, value_name = "FILE", default_value = "sd_final.png")]
     final_image: String,
+
+    /// Do not use autocast.
+    #[arg(long, action)]
+    no_autocast: bool,
 }
 
 fn image_preprocess<T: AsRef<std::path::Path>>(path: T) -> anyhow::Result<Tensor> {
@@ -78,7 +82,7 @@ fn image_preprocess<T: AsRef<std::path::Path>>(path: T) -> anyhow::Result<Tensor
     Ok((image / 255. * 2. - 1.).unsqueeze(0))
 }
 
-fn main() -> anyhow::Result<()> {
+fn run(args: Args) -> anyhow::Result<()> {
     let Args {
         prompt,
         cpu,
@@ -92,7 +96,8 @@ fn main() -> anyhow::Result<()> {
         num_samples,
         strength,
         input_image,
-    } = Args::parse();
+        no_autocast: _,
+    } = args;
     if !(0. ..=1.).contains(&strength) {
         anyhow::bail!("strength should be between 0 and 1, got {strength}")
     }
@@ -184,4 +189,13 @@ fn main() -> anyhow::Result<()> {
 
     drop(no_grad_guard);
     Ok(())
+}
+
+fn main() -> anyhow::Result<()> {
+    let args = Args::parse();
+    if args.no_autocast {
+        run(args)
+    } else {
+        tch::autocast(true, || run(args))
+    }
 }
