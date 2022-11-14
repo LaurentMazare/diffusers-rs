@@ -115,4 +115,12 @@ impl DDIMScheduler {
             prev_sample
         }
     }
+
+    pub fn add_noise(&self, original: &Tensor, timestep: usize) -> Tensor {
+        let timestep = if timestep >= self.alphas_cumprod.len() { timestep - 1 } else { timestep };
+        let noise = original.randn_like();
+        let sqrt_alpha_prod = self.alphas_cumprod[timestep].sqrt();
+        let sqrt_one_minus_alpha_prod = (1.0 - self.alphas_cumprod[timestep]).sqrt();
+        sqrt_alpha_prod * original + sqrt_one_minus_alpha_prod * noise
+    }
 }

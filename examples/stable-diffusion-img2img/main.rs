@@ -146,7 +146,8 @@ fn main() -> anyhow::Result<()> {
 
     for idx in 0..num_samples {
         tch::manual_seed(seed + idx);
-        let mut latents = (init_latent_dist.sample() * 0.18215).to(unet_device);
+        let latents = (init_latent_dist.sample() * 0.18215).to(unet_device);
+        let mut latents = scheduler.add_noise(&latents, t_start);
 
         for (timestep_index, &timestep) in scheduler.timesteps().iter().enumerate() {
             if timestep_index < t_start {
