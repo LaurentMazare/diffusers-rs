@@ -94,9 +94,13 @@ struct Args {
     /// The name of the final image to generate.
     #[arg(long, value_name = "FILE", default_value = "sd_final.png")]
     final_image: String,
+
+    /// Use autocast (disabled by default as it may use more memory in some cases).
+    #[arg(long, action)]
+    autocast: bool,
 }
 
-fn main() -> anyhow::Result<()> {
+fn run(args: Args) -> anyhow::Result<()> {
     let Args {
         prompt,
         cpu,
@@ -108,7 +112,8 @@ fn main() -> anyhow::Result<()> {
         unet_weights,
         sliced_attention_size,
         num_samples,
-    } = Args::parse();
+        autocast: _,
+    } = args;
     tch::maybe_init_cuda();
     println!("Cuda available: {}", tch::Cuda::is_available());
     println!("Cudnn available: {}", tch::Cuda::cudnn_is_available());
@@ -187,4 +192,13 @@ fn main() -> anyhow::Result<()> {
 
     drop(no_grad_guard);
     Ok(())
+}
+
+fn main() -> anyhow::Result<()> {
+    let args = Args::parse();
+    if !args.autocast {
+        run(args)
+    } else {
+        tch::autocast(true, || run(args))
+    }
 }
