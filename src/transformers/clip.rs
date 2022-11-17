@@ -295,8 +295,10 @@ pub struct Tokenizer {
 
 impl Tokenizer {
     /// Creates a new CLIP tokenizer, this takes as input the path for the bpe vocabulary file.
-    pub fn create<T: AsRef<std::path::Path>>(bpe_path: T) -> anyhow::Result<Tokenizer> {
-        let bpe_file = std::fs::File::open(bpe_path)?;
+    pub fn create<T: AsRef<std::path::Path> + std::fmt::Debug>(
+        bpe_path: T,
+    ) -> anyhow::Result<Tokenizer> {
+        let bpe_file = crate::utils::file_open(bpe_path)?;
         let bpe_lines: Result<Vec<String>, _> = std::io::BufReader::new(bpe_file).lines().collect();
         let bpe_lines = bpe_lines?;
         let bpe_lines: Result<Vec<_>, _> = bpe_lines[1..49152 - 256 - 2 + 1]
