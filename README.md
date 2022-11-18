@@ -70,6 +70,28 @@ be changed via the `-prompt` flag.
 ![img2img input](media/in_img2img.jpg)
 ![img2img output](media/out_img2img.jpg)
 
+## Inpainting Pipeline
+
+Inpainting can be used to modify an existing image based on a prompt and modifying the part of the
+initial image specified by a mask.
+This requires different unet weights that could be downloaded on [runwayml/stable-diffusion-inpainting](https://huggingface.co/runwayml/stable-diffusion-inpainting/tree/main/unet). The weights then have to be converted from the `.bin` PyTorch format
+to the `.ot` format, see the commands in the following section.
+
+The following command runs this image to image pipeline:
+
+```bash
+wget https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo.png -O sd_input.png
+wget https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo_mask.png -O sd_mask.png
+cargo run --example stable-diffusion-inpaint --input-image sd_input.png --mask-image sd_mask.png
+```
+
+The default prompt is "Face of a yellow cat, high resolution, sitting on a park bench.", but can
+be changed via the `-prompt` flag.
+
+<img src="https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo.png" width=256><img src="https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo_mask.png" width=256>
+
+![inpaint output](media/out_inpaint.jpg)
+
 ## Getting the Weights and Vocab File
 
 In order to run this, the weights have to be downloaded, converted to the appropriate
