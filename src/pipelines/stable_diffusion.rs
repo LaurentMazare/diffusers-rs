@@ -31,6 +31,7 @@ pub fn build_vae(vae_weights: &str, device: Device) -> anyhow::Result<vae::AutoE
 pub fn build_unet(
     unet_weights: &str,
     device: Device,
+    in_channels: i64,
     sliced_attention_size: Option<i64>,
 ) -> anyhow::Result<unet_2d::UNet2DConditionModel> {
     let mut vs_unet = nn::VarStore::new(device);
@@ -54,7 +55,7 @@ pub fn build_unet(
         norm_num_groups: 32,
         sliced_attention_size,
     };
-    let unet = unet_2d::UNet2DConditionModel::new(vs_unet.root(), 4, 4, unet_cfg);
+    let unet = unet_2d::UNet2DConditionModel::new(vs_unet.root(), in_channels, 4, unet_cfg);
     vs_unet.load(unet_weights)?;
     Ok(unet)
 }

@@ -141,7 +141,7 @@ fn run(args: Args) -> anyhow::Result<()> {
     println!("Building the autoencoder.");
     let vae = stable_diffusion::build_vae(&vae_weights, vae_device)?;
     println!("Building the unet.");
-    let unet = stable_diffusion::build_unet(&unet_weights, unet_device, sliced_attention_size)?;
+    let unet = stable_diffusion::build_unet(&unet_weights, unet_device, 4, sliced_attention_size)?;
 
     println!("Generating the latent from the input image {:?}.", init_image.size());
     let init_image = init_image.to(vae_device);

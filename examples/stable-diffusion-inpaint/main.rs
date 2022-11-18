@@ -5,6 +5,11 @@
 // diffusion standard and inpaint pipelines in the diffusers library.
 // patdiff src/diffusers/pipelines/stable_diffusion/pipeline_stable_diffusion{,_inpaint}.py
 //
+// The unet weights should be downloaded from:
+// https://huggingface.co/runwayml/stable-diffusion-inpainting/blob/main/unet/diffusion_pytorch_model.bin
+// Or for the fp16 version:
+// https://huggingface.co/runwayml/stable-diffusion-inpainting/blob/fp16/unet/diffusion_pytorch_model.bin
+//
 // Sample input image:
 // https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo.png
 // Sample mask:
@@ -30,7 +35,7 @@ struct Args {
     mask_image: String,
 
     /// The prompt to be used for image generation.
-    #[arg(long, default_value = "A fantasy landscape, trending on artstation.")]
+    #[arg(long, default_value = "Face of a yellow cat, high resolution, sitting on a park bench")]
     prompt: Option<String>,
 
     /// When set, use the CPU for the listed devices, can be 'all', 'unet', 'clip', etc.
@@ -39,7 +44,7 @@ struct Args {
     cpu: Vec<String>,
 
     /// The UNet weight file, in .ot format.
-    #[arg(long, value_name = "FILE", default_value = "data/unet.ot")]
+    #[arg(long, value_name = "FILE", default_value = "data/unet-inpaint.ot")]
     unet_weights: String,
 
     /// The CLIP weight file, in .ot format.
@@ -69,10 +74,6 @@ struct Args {
     /// The name of the final image to generate.
     #[arg(long, value_name = "FILE", default_value = "sd_final.png")]
     final_image: String,
-
-    /// Do not use autocast.
-    #[arg(long, action)]
-    no_autocast: bool,
 }
 
 fn prepare_mask_and_masked_image<T: AsRef<std::path::Path>>(
@@ -83,7 +84,7 @@ fn prepare_mask_and_masked_image<T: AsRef<std::path::Path>>(
     let image = image / 255. * 2. - 1.;
 
     let mask = tch::vision::image::load(path_mask)?;
-    let mask = mask.mean_dim(Some([1].as_slice()), true, Kind::Float);
+    let mask = mask.mean_dim(Some([0].as_slice()), true, Kind::Float);
     let mask = mask.ge(122.5).totype(Kind::Float);
     let masked_image: Tensor = image * (1 - &mask);
     Ok((mask.unsqueeze(0), masked_image.unsqueeze(0)))
@@ -103,7 +104,6 @@ fn run(args: Args) -> anyhow::Result<()> {
         num_samples,
         input_image,
         mask_image,
-        no_autocast: _,
     } = args;
     tch::maybe_init_cuda();
     println!("Cuda available: {}", tch::Cuda::is_available());
@@ -117,6 +117,7 @@ fn run(args: Args) -> anyhow::Result<()> {
         }
     };
     let (mask, masked_image) = prepare_mask_and_masked_image(input_image, mask_image)?;
+    println!("Loaded input image and mask, {:?} {:?}.", masked_image.size(), mask.size());
     let clip_device = cpu_or_cuda("clip");
     let vae_device = cpu_or_cuda("vae");
     let unet_device = cpu_or_cuda("unet");
@@ -145,7 +146,7 @@ fn run(args: Args) -> anyhow::Result<()> {
     println!("Building the autoencoder.");
     let vae = stable_diffusion::build_vae(&vae_weights, vae_device)?;
     println!("Building the unet.");
-    let unet = stable_diffusion::build_unet(&unet_weights, unet_device, sliced_attention_size)?;
+    let unet = stable_diffusion::build_unet(&unet_weights, unet_device, 9, sliced_attention_size)?;
 
     // torch.nn.functional.interpolate(mask, size=(height // 8, width // 8))
     let mask = mask.upsample_nearest2d(&[HEIGHT / 8, WIDTH / 8], None, None);
@@ -197,9 +198,5 @@ fn run(args: Args) -> anyhow::Result<()> {
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-    if args.no_autocast {
-        run(args)
-    } else {
-        tch::autocast(true, || run(args))
-    }
+    run(args)
 }
