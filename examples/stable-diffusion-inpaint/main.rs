@@ -2,8 +2,13 @@
 // See the main stable-diffusion example for how to get the weights.
 //
 // This has been mostly adapted from looking at the diff between the sample
-// diffusion standard and img2img pipelines in the diffusers library.
+// diffusion standard and inpaint pipelines in the diffusers library.
 // patdiff src/diffusers/pipelines/stable_diffusion/pipeline_stable_diffusion{,_inpaint}.py
+//
+// Sample input image:
+// https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo.png
+// Sample mask:
+// https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo_mask.png
 use clap::Parser;
 use diffusers::{pipelines::stable_diffusion, schedulers::ddim, transformers::clip};
 use tch::{nn::Module, Device, Kind, Tensor};
