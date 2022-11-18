@@ -17,8 +17,7 @@ The implementation is complete enough so as to be able to run Stable Diffusion
 v1.5.
 
 In order to run the models, one has to get the weights, see the details below and can then run
-the following command. At each step, some `sd_*.png` image is generated, the last one `sd_30.png`
-should be the least noisy one.
+the following command. The final image is named `sd_final.png` by default.
 
 ```bash
 cargo run --example stable-diffusion --features clap -- --prompt "A rusty robot holding a fire torch."
