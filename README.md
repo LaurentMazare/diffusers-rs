@@ -48,12 +48,9 @@ PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.6,max_split_size_mb:128 R
 
 A bunch of rusty robots holding some torches!
 
-![rusty robot holding a torch](media/robot3.jpg)
-![rusty robot holding a torch](media/robot4.jpg)
-![rusty robot holding a torch](media/robot7.jpg)
-![rusty robot holding a torch](media/robot8.jpg)
-![rusty robot holding a torch](media/robot11.jpg)
-![rusty robot holding a torch](media/robot13.jpg)
+<img src="media/robot3.jpg" width=256><img src="media/robot4.jpg" width=256><img src="media/robot7.jpg" width=256>
+
+<img src="media/robot8.jpg" width=256><img src="media/robot11.jpg" width=256><img src="media/robot13.jpg" width=256>
 
 ## Image to Image Pipeline
 
