@@ -31,6 +31,10 @@ required-features = ["clap"]
 name = "stable-diffusion-img2img"
 required-features = ["clap"]
 
+[[example]]
+name = "stable-diffusion-inpaint"
+required-features = ["clap"]
+
 [features]
 doc-only = ["tch/doc-only"]
 
