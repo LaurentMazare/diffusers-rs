@@ -16,13 +16,15 @@ It is based on the [tch crate](https://github.com/LaurentMazare/tch-rs/).
 The implementation is complete enough so as to be able to run Stable Diffusion
 v1.5.
 
-In order to run the models, one has to get the weights, see the details below and can then run
-the following command. The final image is named `sd_final.png` by default.
+In order to run the models, one has to get the weights from this [huggingface
+model repo](https://huggingface.co/lmz/rust-stable-diffusion-v1-5), move them in
+the `data/` directory and then can run the following command.
 
 ```bash
 cargo run --example stable-diffusion --features clap -- --prompt "A rusty robot holding a fire torch."
 ```
 
+The final image is named `sd_final.png` by default.
 The only supported scheduler is the Denoising Diffusion Implicit Model scheduler (DDIM). The
 original paper and some code can be found in the [associated repo](https://github.com/ermongroup/ddim).
 
@@ -71,8 +73,9 @@ be changed via the `-prompt` flag.
 
 Inpainting can be used to modify an existing image based on a prompt and modifying the part of the
 initial image specified by a mask.
-This requires different unet weights that could be downloaded on [runwayml/stable-diffusion-inpainting](https://huggingface.co/runwayml/stable-diffusion-inpainting/tree/main/unet). The weights then have to be converted from the `.bin` PyTorch format
-to the `.ot` format, see the commands in the following section.
+This requires different unet weights `unet-inpaint.ot` that could also be retrieved from this
+[repo](https://huggingface.co/lmz/rust-stable-diffusion-v1-5) and should also be
+placed in the `data/` directory.
 
 The following command runs this image to image pipeline:
 
@@ -89,14 +92,12 @@ be changed via the `-prompt` flag.
 
 ![inpaint output](media/out_inpaint.jpg)
 
-## Getting the Weights and Vocab File
+## Converting the Original Weight Files
 
-In order to run this, the weights have to be downloaded, converted to the appropriate
-format and copied in the top level `data` directory. There are three set of weights to
-download as well as some vocabulary file for the text model.
-
-If there is some interest in having the final weight files available, open an issue and
-we could consider packaging them.
+The weights can be retrieved as `.ot` files from
+[huggingface](https://huggingface.co/lmz/rust-stable-diffusion-v1-5).
+It is also possible to download the weights for the original stable diffusion
+model and convert them to `.ot` files by following the instructions below.
 
 First get the vocabulary file and uncompress it.
 
@@ -123,11 +124,9 @@ model = torch.load("./pytorch_model.bin")
 np.savez("./pytorch_model.npz", **{k: v.numpy() for k, v in model.items() if "text_model" in k})
 ```
 
-Finally use `tensor-tools` from the [tch repo](https://github.com/LaurentMazare/tch-rs/) to convert
-this to a `.ot` file that tch can use.
+Finally use `tensor-tools` from the `examples` directory to convert this to a `.ot` file that tch can use.
 
 ```bash
-cd path/to/tch-rs
 cargo run --release --example tensor-tools cp ./data/pytorch_model.npz ./data/pytorch_model.ot
 ```
 
