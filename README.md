@@ -82,7 +82,7 @@ The following command runs this image to image pipeline:
 ```bash
 wget https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo.png -O sd_input.png
 wget https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo_mask.png -O sd_mask.png
-cargo run --example stable-diffusion-inpaint --input-image sd_input.png --mask-image sd_mask.png
+cargo run --example stable-diffusion-inpaint --features clap --input-image sd_input.png --mask-image sd_mask.png
 ```
 
 The default prompt is "Face of a yellow cat, high resolution, sitting on a park bench.", but can
