@@ -6,10 +6,11 @@ use tch::{nn, Device};
 
 pub fn build_clip_transformer(
     clip_weights: &str,
+    config: &clip::Config,
     device: Device,
 ) -> anyhow::Result<clip::ClipTextTransformer> {
     let mut vs = nn::VarStore::new(device);
-    let text_model = clip::ClipTextTransformer::new(vs.root());
+    let text_model = clip::ClipTextTransformer::new(vs.root(), config);
     vs.load(clip_weights)?;
     Ok(text_model)
 }

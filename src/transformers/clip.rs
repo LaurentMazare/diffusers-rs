@@ -8,16 +8,48 @@ use std::collections::{HashMap, HashSet};
 use std::io::BufRead;
 use tch::{nn, nn::Module, Device, Kind, Tensor};
 
+#[derive(Debug, Clone, Copy)]
+pub enum Activation {
+    QuickGelu,
+    Gelu,
+}
+
+impl Module for Activation {
+    fn forward(&self, xs: &Tensor) -> Tensor {
+        match self {
+            Activation::QuickGelu => xs * (xs * 1.702).sigmoid(),
+            Activation::Gelu => xs.gelu("none"),
+        }
+    }
+}
+
 // The config details can be found in the "text_config" section of this json file:
 // https://huggingface.co/openai/clip-vit-large-patch14/blob/main/config.json
 //   "hidden_act": "quick_gelu"
-// These should probably be made configurable instead.
-const VOCAB_SIZE: i64 = 49408;
-const EMBED_DIM: i64 = 768; // a.k.a. config.hidden_size
-const INTERMEDIATE_SIZE: i64 = 3072;
-const MAX_POSITION_EMBEDDINGS: usize = 77;
-const NUM_HIDDEN_LAYERS: i64 = 12;
-const NUM_ATTENTION_HEADS: i64 = 12;
+#[derive(Debug, Clone, Copy)]
+pub struct Config {
+    vocab_size: i64,
+    embed_dim: i64,         // aka config.hidden_size
+    activation: Activation, // aka config.hidden_act
+    intermediate_size: i64,
+    max_position_embeddings: usize,
+    num_hidden_layers: i64,
+    num_attention_heads: i64,
+}
+
+impl Config {
+    pub fn v1_5() -> Self {
+        Self {
+            vocab_size: 49408,
+            embed_dim: 768,
+            intermediate_size: 3072,
+            max_position_embeddings: 77,
+            num_hidden_layers: 12,
+            num_attention_heads: 12,
+            activation: Activation::QuickGelu,
+        }
+    }
+}
 
 const BYTES_TO_UNICODE: [(u8, char); 256] = [
     (33, '!'),
@@ -291,12 +323,14 @@ pub struct Tokenizer {
     bpe_ranks: HashMap<(String, String), usize>,
     start_of_text_token: usize,
     end_of_text_token: usize,
+    max_position_embeddings: usize,
 }
 
 impl Tokenizer {
     /// Creates a new CLIP tokenizer, this takes as input the path for the bpe vocabulary file.
     pub fn create<T: AsRef<std::path::Path> + std::fmt::Debug>(
         bpe_path: T,
+        c: &Config,
     ) -> anyhow::Result<Tokenizer> {
         let bpe_file = crate::utils::file_open(bpe_path)?;
         let bpe_lines: Result<Vec<String>, _> = std::io::BufReader::new(bpe_file).lines().collect();
@@ -331,8 +365,15 @@ impl Tokenizer {
         let bpe_ranks: HashMap<_, _> =
             bpe_lines.into_iter().enumerate().map(|(i, v)| (v, i)).collect();
         let re = regex::Regex::new(PAT)?;
-        let tokenizer =
-            Tokenizer { encoder, re, bpe_ranks, decoder, start_of_text_token, end_of_text_token };
+        let tokenizer = Tokenizer {
+            encoder,
+            re,
+            bpe_ranks,
+            decoder,
+            start_of_text_token,
+            end_of_text_token,
+            max_position_embeddings: c.max_position_embeddings,
+        };
         Ok(tokenizer)
     }
 
@@ -415,7 +456,7 @@ impl Tokenizer {
 
     /// The main tokenization entry point, takes as input a string and returns the list of tokens.
     pub fn encode(&self, s: &str) -> anyhow::Result<Vec<usize>> {
-        self.encode_pad(s, Some(MAX_POSITION_EMBEDDINGS))
+        self.encode_pad(s, Some(self.max_position_embeddings))
     }
 
     /// The inverse of the tokenization process, takes as input a list of tokens and returns a
@@ -436,17 +477,17 @@ struct ClipTextEmbeddings {
 }
 
 impl ClipTextEmbeddings {
-    fn new(vs: nn::Path) -> Self {
+    fn new(vs: nn::Path, c: &Config) -> Self {
         let token_embedding =
-            nn::embedding(&vs / "token_embedding", VOCAB_SIZE, EMBED_DIM, Default::default());
+            nn::embedding(&vs / "token_embedding", c.vocab_size, c.embed_dim, Default::default());
         let position_embedding = nn::embedding(
             &vs / "position_embedding",
-            MAX_POSITION_EMBEDDINGS as i64,
-            EMBED_DIM,
+            c.max_position_embeddings as i64,
+            c.embed_dim,
             Default::default(),
         );
         let position_ids =
-            Tensor::arange(MAX_POSITION_EMBEDDINGS as i64, (Kind::Int64, vs.device()))
+            Tensor::arange(c.max_position_embeddings as i64, (Kind::Int64, vs.device()))
                 .expand(&[1, -1], false);
         ClipTextEmbeddings { token_embedding, position_embedding, position_ids }
     }
@@ -460,10 +501,6 @@ impl Module for ClipTextEmbeddings {
     }
 }
 
-fn quick_gelu(xs: &Tensor) -> Tensor {
-    xs * (xs * 1.702).sigmoid()
-}
-
 #[derive(Debug)]
 struct ClipAttention {
     k_proj: nn::Linear,
@@ -472,41 +509,46 @@ struct ClipAttention {
     out_proj: nn::Linear,
     head_dim: i64,
     scale: f64,
+    num_attention_heads: i64,
 }
 
 impl ClipAttention {
-    fn new(vs: nn::Path) -> Self {
-        let k_proj = nn::linear(&vs / "k_proj", EMBED_DIM, EMBED_DIM, Default::default());
-        let v_proj = nn::linear(&vs / "v_proj", EMBED_DIM, EMBED_DIM, Default::default());
-        let q_proj = nn::linear(&vs / "q_proj", EMBED_DIM, EMBED_DIM, Default::default());
-        let out_proj = nn::linear(&vs / "out_proj", EMBED_DIM, EMBED_DIM, Default::default());
-        let head_dim = EMBED_DIM / NUM_ATTENTION_HEADS;
+    fn new(vs: nn::Path, c: &Config) -> Self {
+        let embed_dim = c.embed_dim;
+        let num_attention_heads = c.num_attention_heads;
+        let k_proj = nn::linear(&vs / "k_proj", embed_dim, embed_dim, Default::default());
+        let v_proj = nn::linear(&vs / "v_proj", embed_dim, embed_dim, Default::default());
+        let q_proj = nn::linear(&vs / "q_proj", embed_dim, embed_dim, Default::default());
+        let out_proj = nn::linear(&vs / "out_proj", embed_dim, embed_dim, Default::default());
+        let head_dim = embed_dim / num_attention_heads;
         let scale = (head_dim as f64).powf(-0.5);
-        ClipAttention { k_proj, v_proj, q_proj, out_proj, head_dim, scale }
+        ClipAttention { k_proj, v_proj, q_proj, out_proj, head_dim, scale, num_attention_heads }
     }
 
     fn shape(&self, xs: &Tensor, seq_len: i64, bsz: i64) -> Tensor {
-        xs.view((bsz, seq_len, NUM_ATTENTION_HEADS, self.head_dim)).transpose(1, 2).contiguous()
+        xs.view((bsz, seq_len, self.num_attention_heads, self.head_dim))
+            .transpose(1, 2)
+            .contiguous()
     }
 
     fn forward(&self, xs: &Tensor, causal_attention_mask: &Tensor) -> Tensor {
         let (bsz, tgt_len, embed_dim) = xs.size3().unwrap();
         let query_states = xs.apply(&self.q_proj) * self.scale;
-        let proj_shape = (bsz * NUM_ATTENTION_HEADS, -1, self.head_dim);
+        let proj_shape = (bsz * self.num_attention_heads, -1, self.head_dim);
         let query_states = self.shape(&query_states, tgt_len, bsz).view(proj_shape);
         let key_states = self.shape(&xs.apply(&self.k_proj), -1, bsz).view(proj_shape);
         let value_states = self.shape(&xs.apply(&self.v_proj), -1, bsz).view(proj_shape);
         let attn_weights = query_states.bmm(&key_states.transpose(1, 2));
 
         let src_len = key_states.size()[1];
-        let attn_weights =
-            attn_weights.view((bsz, NUM_ATTENTION_HEADS, tgt_len, src_len)) + causal_attention_mask;
-        let attn_weights = attn_weights.view((bsz * NUM_ATTENTION_HEADS, tgt_len, src_len));
+        let attn_weights = attn_weights.view((bsz, self.num_attention_heads, tgt_len, src_len))
+            + causal_attention_mask;
+        let attn_weights = attn_weights.view((bsz * self.num_attention_heads, tgt_len, src_len));
         let attn_weights = attn_weights.softmax(-1, Kind::Float);
 
         let attn_output = attn_weights.bmm(&value_states);
         attn_output
-            .view((bsz, NUM_ATTENTION_HEADS, tgt_len, self.head_dim))
+            .view((bsz, self.num_attention_heads, tgt_len, self.head_dim))
             .transpose(1, 2)
             .reshape(&[bsz, tgt_len, embed_dim])
             .apply(&self.out_proj)
@@ -517,20 +559,21 @@ impl ClipAttention {
 struct ClipMlp {
     fc1: nn::Linear,
     fc2: nn::Linear,
+    activation: Activation,
 }
 
 impl ClipMlp {
-    fn new(vs: nn::Path) -> Self {
-        let fc1 = nn::linear(&vs / "fc1", EMBED_DIM, INTERMEDIATE_SIZE, Default::default());
-        let fc2 = nn::linear(&vs / "fc2", INTERMEDIATE_SIZE, EMBED_DIM, Default::default());
-        ClipMlp { fc1, fc2 }
+    fn new(vs: nn::Path, c: &Config) -> Self {
+        let fc1 = nn::linear(&vs / "fc1", c.embed_dim, c.intermediate_size, Default::default());
+        let fc2 = nn::linear(&vs / "fc2", c.intermediate_size, c.embed_dim, Default::default());
+        ClipMlp { fc1, fc2, activation: c.activation }
     }
 }
 
 impl Module for ClipMlp {
     fn forward(&self, xs: &Tensor) -> Tensor {
         let xs = xs.apply(&self.fc1);
-        quick_gelu(&xs).apply(&self.fc2)
+        self.activation.forward(&xs).apply(&self.fc2)
     }
 }
 
@@ -543,11 +586,13 @@ struct ClipEncoderLayer {
 }
 
 impl ClipEncoderLayer {
-    fn new(vs: nn::Path) -> Self {
-        let self_attn = ClipAttention::new(&vs / "self_attn");
-        let layer_norm1 = nn::layer_norm(&vs / "layer_norm1", vec![EMBED_DIM], Default::default());
-        let mlp = ClipMlp::new(&vs / "mlp");
-        let layer_norm2 = nn::layer_norm(&vs / "layer_norm2", vec![EMBED_DIM], Default::default());
+    fn new(vs: nn::Path, c: &Config) -> Self {
+        let self_attn = ClipAttention::new(&vs / "self_attn", c);
+        let layer_norm1 =
+            nn::layer_norm(&vs / "layer_norm1", vec![c.embed_dim], Default::default());
+        let mlp = ClipMlp::new(&vs / "mlp", c);
+        let layer_norm2 =
+            nn::layer_norm(&vs / "layer_norm2", vec![c.embed_dim], Default::default());
         ClipEncoderLayer { self_attn, layer_norm1, mlp, layer_norm2 }
     }
 
@@ -570,11 +615,11 @@ struct ClipEncoder {
 }
 
 impl ClipEncoder {
-    fn new(vs: nn::Path) -> Self {
+    fn new(vs: nn::Path, c: &Config) -> Self {
         let vs = &vs / "layers";
         let mut layers: Vec<ClipEncoderLayer> = Vec::new();
-        for index in 0..NUM_HIDDEN_LAYERS {
-            let layer = ClipEncoderLayer::new(&vs / index);
+        for index in 0..c.num_hidden_layers {
+            let layer = ClipEncoderLayer::new(&vs / index, c);
             layers.push(layer)
         }
         ClipEncoder { layers }
@@ -598,12 +643,12 @@ pub struct ClipTextTransformer {
 }
 
 impl ClipTextTransformer {
-    pub fn new(vs: nn::Path) -> Self {
+    pub fn new(vs: nn::Path, c: &Config) -> Self {
         let vs = &vs / "text_model";
-        let embeddings = ClipTextEmbeddings::new(&vs / "embeddings");
-        let encoder = ClipEncoder::new(&vs / "encoder");
+        let embeddings = ClipTextEmbeddings::new(&vs / "embeddings", c);
+        let encoder = ClipEncoder::new(&vs / "encoder", c);
         let final_layer_norm =
-            nn::layer_norm(&vs / "final_layer_norm", vec![EMBED_DIM], Default::default());
+            nn::layer_norm(&vs / "final_layer_norm", vec![c.embed_dim], Default::default());
         ClipTextTransformer { embeddings, encoder, final_layer_norm }
     }
 

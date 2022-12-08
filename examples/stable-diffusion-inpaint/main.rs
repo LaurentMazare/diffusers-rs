@@ -123,7 +123,8 @@ fn run(args: Args) -> anyhow::Result<()> {
     let unet_device = cpu_or_cuda("unet");
     let scheduler = ddim::DDIMScheduler::new(n_steps, 1000, Default::default());
 
-    let tokenizer = clip::Tokenizer::create("data/bpe_simple_vocab_16e6.txt")?;
+    let clip_config = clip::Config::v1_5();
+    let tokenizer = clip::Tokenizer::create("data/bpe_simple_vocab_16e6.txt", &clip_config)?;
     let prompt = prompt.unwrap_or_else(|| {
         "A very realistic photo of a rusty robot walking on a sandy beach".to_string()
     });
@@ -138,7 +139,8 @@ fn run(args: Args) -> anyhow::Result<()> {
     let no_grad_guard = tch::no_grad_guard();
 
     println!("Building the Clip transformer.");
-    let text_model = stable_diffusion::build_clip_transformer(&clip_weights, clip_device)?;
+    let text_model =
+        stable_diffusion::build_clip_transformer(&clip_weights, &clip_config, clip_device)?;
     let text_embeddings = text_model.forward(&tokens);
     let uncond_embeddings = text_model.forward(&uncond_tokens);
     let text_embeddings = Tensor::cat(&[uncond_embeddings, text_embeddings], 0).to(unet_device);
