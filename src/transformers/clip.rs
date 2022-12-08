@@ -23,9 +23,6 @@ impl Module for Activation {
     }
 }
 
-// The config details can be found in the "text_config" section of this json file:
-// https://huggingface.co/openai/clip-vit-large-patch14/blob/main/config.json
-//   "hidden_act": "quick_gelu"
 #[derive(Debug, Clone, Copy)]
 pub struct Config {
     vocab_size: i64,
@@ -35,9 +32,13 @@ pub struct Config {
     max_position_embeddings: usize,
     num_hidden_layers: i64,
     num_attention_heads: i64,
+    #[allow(dead_code)]
+    projection_dim: i64,
 }
 
 impl Config {
+    // The config details can be found in the "text_config" section of this json file:
+    // https://huggingface.co/openai/clip-vit-large-patch14/blob/main/config.json
     pub fn v1_5() -> Self {
         Self {
             vocab_size: 49408,
@@ -46,7 +47,22 @@ impl Config {
             max_position_embeddings: 77,
             num_hidden_layers: 12,
             num_attention_heads: 12,
+            projection_dim: 768,
             activation: Activation::QuickGelu,
+        }
+    }
+
+    // https://huggingface.co/stabilityai/stable-diffusion-2-1/blob/main/text_encoder/config.json
+    pub fn v2_1() -> Self {
+        Self {
+            vocab_size: 49408,
+            embed_dim: 1024,
+            intermediate_size: 4096,
+            max_position_embeddings: 77,
+            num_hidden_layers: 23,
+            num_attention_heads: 16,
+            projection_dim: 512,
+            activation: Activation::Gelu,
         }
     }
 }
