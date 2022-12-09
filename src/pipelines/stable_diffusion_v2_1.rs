@@ -2,12 +2,12 @@ use crate::models::{unet_2d, vae};
 use tch::{nn, Device};
 
 pub fn clip_config() -> crate::transformers::clip::Config {
-    crate::transformers::clip::Config::v1_5()
+    crate::transformers::clip::Config::v2_1()
 }
 
 pub fn build_vae(vae_weights: &str, device: Device) -> anyhow::Result<vae::AutoEncoderKL> {
     let mut vs_ae = nn::VarStore::new(device);
-    // https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/vae/config.json
+    // https://huggingface.co/stabilityai/stable-diffusion-2-1/blob/main/vae/config.json
     let autoencoder_cfg = vae::AutoEncoderKLConfig {
         block_out_channels: vec![128, 256, 512, 512],
         layers_per_block: 2,
@@ -26,9 +26,9 @@ pub fn build_unet(
     sliced_attention_size: Option<i64>,
 ) -> anyhow::Result<unet_2d::UNet2DConditionModel> {
     let mut vs_unet = nn::VarStore::new(device);
-    // https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/unet/config.json
+    // https://huggingface.co/stabilityai/stable-diffusion-2-1/blob/main/vae/config.json
     let unet_cfg = unet_2d::UNet2DConditionModelConfig {
-        attention_head_dim: 8,
+        attention_head_dim: 8, // TODO
         blocks: vec![
             unet_2d::BlockConfig { out_channels: 320, use_cross_attn: true },
             unet_2d::BlockConfig { out_channels: 640, use_cross_attn: true },
@@ -36,7 +36,7 @@ pub fn build_unet(
             unet_2d::BlockConfig { out_channels: 1280, use_cross_attn: false },
         ],
         center_input_sample: false,
-        cross_attention_dim: 768,
+        cross_attention_dim: 1024,
         downsample_padding: 1,
         flip_sin_to_cos: true,
         freq_shift: 0.,
