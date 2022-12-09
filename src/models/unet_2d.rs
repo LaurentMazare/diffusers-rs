@@ -10,6 +10,7 @@ use tch::{nn, Kind, Tensor};
 pub struct BlockConfig {
     pub out_channels: i64,
     pub use_cross_attn: bool,
+    pub attention_head_dim: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -24,7 +25,6 @@ pub struct UNet2DConditionModelConfig {
     pub norm_num_groups: i64,
     pub norm_eps: f64,
     pub cross_attention_dim: i64,
-    pub attention_head_dim: i64,
     pub sliced_attention_size: Option<i64>,
 }
 
@@ -35,10 +35,10 @@ impl Default for UNet2DConditionModelConfig {
             flip_sin_to_cos: true,
             freq_shift: 0.,
             blocks: vec![
-                BlockConfig { out_channels: 320, use_cross_attn: true },
-                BlockConfig { out_channels: 640, use_cross_attn: true },
-                BlockConfig { out_channels: 1280, use_cross_attn: true },
-                BlockConfig { out_channels: 1280, use_cross_attn: false },
+                BlockConfig { out_channels: 320, use_cross_attn: true, attention_head_dim: 8 },
+                BlockConfig { out_channels: 640, use_cross_attn: true, attention_head_dim: 8 },
+                BlockConfig { out_channels: 1280, use_cross_attn: true, attention_head_dim: 8 },
+                BlockConfig { out_channels: 1280, use_cross_attn: false, attention_head_dim: 8 },
             ],
             layers_per_block: 2,
             downsample_padding: 1,
@@ -46,7 +46,6 @@ impl Default for UNet2DConditionModelConfig {
             norm_num_groups: 32,
             norm_eps: 1e-5,
             cross_attention_dim: 1280,
-            attention_head_dim: 8,
             sliced_attention_size: None,
         }
     }
@@ -87,6 +86,7 @@ impl UNet2DConditionModel {
         let n_blocks = config.blocks.len();
         let b_channels = config.blocks[0].out_channels;
         let bl_channels = config.blocks.last().unwrap().out_channels;
+        let bl_attention_head_dim = config.blocks.last().unwrap().attention_head_dim;
         let time_embed_dim = b_channels * 4;
         let conv_cfg = nn::ConvConfig { stride: 1, padding: 1, ..Default::default() };
         let conv_in = nn::conv2d(&vs / "conv_in", in_channels, b_channels, 3, conv_cfg);
@@ -99,7 +99,8 @@ impl UNet2DConditionModel {
         let vs_db = &vs / "down_blocks";
         let down_blocks = (0..n_blocks)
             .map(|i| {
-                let BlockConfig { out_channels, use_cross_attn } = config.blocks[i];
+                let BlockConfig { out_channels, use_cross_attn, attention_head_dim } =
+                    config.blocks[i];
                 let in_channels =
                     if i > 0 { config.blocks[i - 1].out_channels } else { b_channels };
                 let db_cfg = DownBlock2DConfig {
@@ -113,7 +114,7 @@ impl UNet2DConditionModel {
                 if use_cross_attn {
                     let config = CrossAttnDownBlock2DConfig {
                         downblock: db_cfg,
-                        attn_num_head_channels: config.attention_head_dim,
+                        attn_num_head_channels: attention_head_dim,
                         cross_attention_dim: config.cross_attention_dim,
                         sliced_attention_size: config.sliced_attention_size,
                     };
@@ -142,7 +143,7 @@ impl UNet2DConditionModel {
             resnet_eps: config.norm_eps,
             output_scale_factor: config.mid_block_scale_factor,
             cross_attn_dim: config.cross_attention_dim,
-            attn_num_head_channels: config.attention_head_dim,
+            attn_num_head_channels: bl_attention_head_dim,
             resnet_groups: Some(config.norm_num_groups),
             ..Default::default()
         };
@@ -156,7 +157,8 @@ impl UNet2DConditionModel {
         let vs_ub = &vs / "up_blocks";
         let up_blocks = (0..n_blocks)
             .map(|i| {
-                let BlockConfig { out_channels, use_cross_attn } = config.blocks[n_blocks - 1 - i];
+                let BlockConfig { out_channels, use_cross_attn, attention_head_dim } =
+                    config.blocks[n_blocks - 1 - i];
                 let prev_out_channels =
                     if i > 0 { config.blocks[n_blocks - i].out_channels } else { bl_channels };
                 let in_channels = {
@@ -173,7 +175,7 @@ impl UNet2DConditionModel {
                 if use_cross_attn {
                     let config = CrossAttnUpBlock2DConfig {
                         upblock: ub_cfg,
-                        attn_num_head_channels: config.attention_head_dim,
+                        attn_num_head_channels: attention_head_dim,
                         cross_attention_dim: config.cross_attention_dim,
                         sliced_attention_size: config.sliced_attention_size,
                     };

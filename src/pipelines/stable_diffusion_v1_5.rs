@@ -26,15 +26,15 @@ pub fn build_unet(
     sliced_attention_size: Option<i64>,
 ) -> anyhow::Result<unet_2d::UNet2DConditionModel> {
     let mut vs_unet = nn::VarStore::new(device);
+    let bc = |out_channels, use_cross_attn, attention_head_dim| unet_2d::BlockConfig {
+        out_channels,
+        use_cross_attn,
+        attention_head_dim,
+    };
+
     // https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/unet/config.json
     let unet_cfg = unet_2d::UNet2DConditionModelConfig {
-        attention_head_dim: 8,
-        blocks: vec![
-            unet_2d::BlockConfig { out_channels: 320, use_cross_attn: true },
-            unet_2d::BlockConfig { out_channels: 640, use_cross_attn: true },
-            unet_2d::BlockConfig { out_channels: 1280, use_cross_attn: true },
-            unet_2d::BlockConfig { out_channels: 1280, use_cross_attn: false },
-        ],
+        blocks: vec![bc(320, true, 8), bc(640, true, 8), bc(1280, true, 8), bc(1280, false, 8)],
         center_input_sample: false,
         cross_attention_dim: 768,
         downsample_padding: 1,
