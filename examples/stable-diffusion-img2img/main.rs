@@ -9,7 +9,8 @@
 // image: https://raw.githubusercontent.com/CompVis/stable-diffusion/main/assets/stable-samples/img2img/sketch-mountains-input.jpg
 // prompt = "A fantasy landscape, trending on artstation"
 use clap::Parser;
-use diffusers::{pipelines::stable_diffusion, schedulers::ddim, transformers::clip};
+use diffusers::pipelines::stable_diffusion::v1_5 as stable_diffusion;
+use diffusers::{schedulers::ddim, transformers::clip};
 use tch::{nn::Module, Device, Kind, Tensor};
 
 const GUIDANCE_SCALE: f64 = 7.5;

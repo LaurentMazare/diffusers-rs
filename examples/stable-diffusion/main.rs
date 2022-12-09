@@ -38,7 +38,8 @@
 //   cargo run --release --example tensor-tools cp ./data/vae.npz ./data/vae.ot
 //   cargo run --release --example tensor-tools cp ./data/unet.npz ./data/unet.ot
 use clap::Parser;
-use diffusers::{pipelines::stable_diffusion, schedulers::ddim, transformers::clip};
+use diffusers::pipelines::stable_diffusion::v1_5 as stable_diffusion;
+use diffusers::{schedulers::ddim, transformers::clip};
 use tch::{nn::Module, Device, Kind, Tensor};
 
 const HEIGHT: i64 = 512;

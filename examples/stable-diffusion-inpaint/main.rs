@@ -15,7 +15,8 @@
 // Sample mask:
 // https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo_mask.png
 use clap::Parser;
-use diffusers::{pipelines::stable_diffusion, schedulers::ddim, transformers::clip};
+use diffusers::pipelines::stable_diffusion::v1_5 as stable_diffusion;
+use diffusers::{schedulers::ddim, transformers::clip};
 use tch::{nn::Module, Device, Kind, Tensor};
 
 const HEIGHT: i64 = 512;
