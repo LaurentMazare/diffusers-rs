@@ -207,20 +207,34 @@ pub struct SpatialTransformerConfig {
     pub num_groups: i64,
     pub context_dim: Option<i64>,
     pub sliced_attention_size: Option<i64>,
+    pub use_linear_projection: bool,
 }
 
 impl Default for SpatialTransformerConfig {
     fn default() -> Self {
-        Self { depth: 1, num_groups: 32, context_dim: None, sliced_attention_size: None }
+        Self {
+            depth: 1,
+            num_groups: 32,
+            context_dim: None,
+            sliced_attention_size: None,
+            use_linear_projection: false,
+        }
     }
 }
 
 #[derive(Debug)]
+enum Proj {
+    Conv2D(nn::Conv2D),
+    Linear(nn::Linear),
+}
+
+// Aka Transformer2DModel
+#[derive(Debug)]
 pub struct SpatialTransformer {
     norm: nn::GroupNorm,
-    proj_in: nn::Conv2D,
+    proj_in: Proj,
     transformer_blocks: Vec<BasicTransformerBlock>,
-    proj_out: nn::Conv2D,
+    proj_out: Proj,
     pub config: SpatialTransformerConfig,
 }
 
@@ -236,7 +250,11 @@ impl SpatialTransformer {
         let group_cfg = nn::GroupNormConfig { eps: 1e-6, affine: true, ..Default::default() };
         let norm = nn::group_norm(&vs / "norm", config.num_groups, in_channels, group_cfg);
         let conv_cfg = nn::ConvConfig { stride: 1, padding: 0, ..Default::default() };
-        let proj_in = nn::conv2d(&vs / "proj_in", in_channels, inner_dim, 1, conv_cfg);
+        let proj_in = if config.use_linear_projection {
+            Proj::Linear(nn::linear(&vs / "proj_in", in_channels, inner_dim, Default::default()))
+        } else {
+            Proj::Conv2D(nn::conv2d(&vs / "proj_in", in_channels, inner_dim, 1, conv_cfg))
+        };
         let mut transformer_blocks = vec![];
         let vs_tb = &vs / "transformer_blocks";
         for index in 0..config.depth {
@@ -250,23 +268,43 @@ impl SpatialTransformer {
             );
             transformer_blocks.push(tb)
         }
-        let proj_out = nn::conv2d(&vs / "proj_out", inner_dim, in_channels, 1, conv_cfg);
+        let proj_out = if config.use_linear_projection {
+            Proj::Linear(nn::linear(&vs / "proj_out", inner_dim, in_channels, Default::default()))
+        } else {
+            Proj::Conv2D(nn::conv2d(&vs / "proj_out", inner_dim, in_channels, 1, conv_cfg))
+        };
         Self { norm, proj_in, transformer_blocks, proj_out, config }
     }
 
     pub fn forward(&self, xs: &Tensor, context: Option<&Tensor>) -> Tensor {
         let (batch, _channel, height, weight) = xs.size4().unwrap();
         let residual = xs;
-        let xs = xs.apply(&self.norm).apply(&self.proj_in);
-        let inner_dim = xs.size()[1];
-        let mut xs = xs.permute(&[0, 2, 3, 1]).view((batch, height * weight, inner_dim));
+        let xs = xs.apply(&self.norm);
+        let (inner_dim, xs) = match &self.proj_in {
+            Proj::Conv2D(p) => {
+                let xs = xs.apply(p);
+                let inner_dim = xs.size()[1];
+                let xs = xs.permute(&[0, 2, 3, 1]).view((batch, height * weight, inner_dim));
+                (inner_dim, xs)
+            }
+            Proj::Linear(p) => {
+                let inner_dim = xs.size()[1];
+                let xs = xs.permute(&[0, 2, 3, 1]).view((batch, height * weight, inner_dim));
+                (inner_dim, xs.apply(p))
+            }
+        };
+        let mut xs = xs;
         for block in self.transformer_blocks.iter() {
             xs = block.forward(&xs, context)
         }
-        let xs = xs
-            .view((batch, height, weight, inner_dim))
-            .permute(&[0, 3, 1, 2])
-            .apply(&self.proj_out);
+        let xs = match &self.proj_out {
+            Proj::Conv2D(p) => {
+                xs.view((batch, height, weight, inner_dim)).permute(&[0, 3, 1, 2]).apply(p)
+            }
+            Proj::Linear(p) => {
+                xs.apply(p).view((batch, height, weight, inner_dim)).permute(&[0, 3, 1, 2])
+            }
+        };
         xs + residual
     }
 }

@@ -32,7 +32,7 @@ pub fn build_unet(
         attention_head_dim,
     };
 
-    // https://huggingface.co/stabilityai/stable-diffusion-2-1/blob/main/vae/config.json
+    // https://huggingface.co/stabilityai/stable-diffusion-2-1/blob/main/unet/config.json
     let unet_cfg = unet_2d::UNet2DConditionModelConfig {
         blocks: vec![bc(320, true, 5), bc(640, true, 10), bc(1280, true, 20), bc(1280, false, 20)],
         center_input_sample: false,
@@ -45,6 +45,7 @@ pub fn build_unet(
         norm_eps: 1e-5,
         norm_num_groups: 32,
         sliced_attention_size,
+        use_linear_projection: true,
     };
     let unet = unet_2d::UNet2DConditionModel::new(vs_unet.root(), in_channels, 4, unet_cfg);
     vs_unet.load(unet_weights)?;

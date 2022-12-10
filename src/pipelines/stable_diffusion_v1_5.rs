@@ -45,6 +45,7 @@ pub fn build_unet(
         norm_eps: 1e-5,
         norm_num_groups: 32,
         sliced_attention_size,
+        use_linear_projection: false,
     };
     let unet = unet_2d::UNet2DConditionModel::new(vs_unet.root(), in_channels, 4, unet_cfg);
     vs_unet.load(unet_weights)?;
