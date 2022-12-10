@@ -148,6 +148,7 @@ impl UNet2DConditionModel {
             cross_attn_dim: config.cross_attention_dim,
             attn_num_head_channels: bl_attention_head_dim,
             resnet_groups: Some(config.norm_num_groups),
+            use_linear_projection: config.use_linear_projection,
             ..Default::default()
         };
         let mid_block = UNetMidBlock2DCrossAttn::new(

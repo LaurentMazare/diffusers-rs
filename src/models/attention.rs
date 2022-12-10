@@ -269,7 +269,7 @@ impl SpatialTransformer {
             transformer_blocks.push(tb)
         }
         let proj_out = if config.use_linear_projection {
-            Proj::Linear(nn::linear(&vs / "proj_out", inner_dim, in_channels, Default::default()))
+            Proj::Linear(nn::linear(&vs / "proj_out", in_channels, inner_dim, Default::default()))
         } else {
             Proj::Conv2D(nn::conv2d(&vs / "proj_out", inner_dim, in_channels, 1, conv_cfg))
         };
