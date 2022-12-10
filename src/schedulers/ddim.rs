@@ -19,6 +19,12 @@ pub enum BetaSchedule {
     ScaledLinear,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum PredictionType {
+    Epsilon,
+    VPrediction,
+}
+
 /// The configuration for the DDIM scheduler.
 #[derive(Debug, Clone, Copy)]
 pub struct DDIMSchedulerConfig {
@@ -30,6 +36,9 @@ pub struct DDIMSchedulerConfig {
     pub beta_schedule: BetaSchedule,
     /// The amount of noise to be added at each step.
     pub eta: f64,
+    /// Adjust the indexes of the inference schedule by this value.
+    pub steps_offset: usize,
+    pub prediction_type: PredictionType,
 }
 
 impl Default for DDIMSchedulerConfig {
@@ -39,6 +48,8 @@ impl Default for DDIMSchedulerConfig {
             beta_end: 0.012f64,
             beta_schedule: BetaSchedule::ScaledLinear,
             eta: 0.,
+            steps_offset: 1,
+            prediction_type: PredictionType::Epsilon,
         }
     }
 }
@@ -63,8 +74,10 @@ impl DDIMScheduler {
         config: DDIMSchedulerConfig,
     ) -> Self {
         let step_ratio = train_timesteps / inference_steps;
-        // TODO: Remove this hack which aimed at matching the behavior of diffusers==0.2.4
-        let timesteps = (0..(inference_steps + 1)).map(|s| s * step_ratio).rev().collect();
+        let timesteps: Vec<usize> = (0..(inference_steps))
+            .map(|s| (s * step_ratio) as usize + config.steps_offset)
+            .rev()
+            .collect();
         let betas = match config.beta_schedule {
             BetaSchedule::ScaledLinear => Tensor::linspace(
                 config.beta_start.sqrt(),
@@ -100,8 +113,19 @@ impl DDIMScheduler {
         let beta_prod_t = 1. - alpha_prod_t;
         let beta_prod_t_prev = 1. - alpha_prod_t_prev;
 
-        let pred_original_sample =
-            (sample - beta_prod_t.sqrt() * model_output) / alpha_prod_t.sqrt();
+        let (pred_original_sample, model_output) = match self.config.prediction_type {
+            PredictionType::Epsilon => {
+                let pred_original_sample =
+                    (sample - beta_prod_t.sqrt() * model_output) / alpha_prod_t.sqrt();
+                (pred_original_sample, model_output.shallow_clone())
+            }
+            PredictionType::VPrediction => {
+                let pred_original_sample =
+                    alpha_prod_t.sqrt() * sample - beta_prod_t.sqrt() * model_output;
+                let model_output = alpha_prod_t.sqrt() * model_output + beta_prod_t.sqrt() * sample;
+                (pred_original_sample, model_output)
+            }
+        };
 
         let variance = (beta_prod_t_prev / beta_prod_t) * (1. - alpha_prod_t / alpha_prod_t_prev);
         let std_dev_t = self.config.eta * variance.sqrt();

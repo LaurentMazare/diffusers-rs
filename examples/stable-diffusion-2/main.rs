@@ -81,7 +81,7 @@ struct Args {
     sliced_attention_size: Option<i64>,
 
     /// The number of steps to run the diffusion for.
-    #[arg(long, default_value_t = 30)]
+    #[arg(long, default_value_t = 50)]
     n_steps: usize,
 
     /// The random seed to be used for the generation.
@@ -129,7 +129,11 @@ fn run(args: Args) -> anyhow::Result<()> {
     let clip_device = cpu_or_cuda("clip");
     let vae_device = cpu_or_cuda("vae");
     let unet_device = cpu_or_cuda("unet");
-    let scheduler = ddim::DDIMScheduler::new(n_steps, 1000, Default::default());
+    let scheduler_config = ddim::DDIMSchedulerConfig {
+        prediction_type: ddim::PredictionType::VPrediction,
+        ..Default::default()
+    };
+    let scheduler = ddim::DDIMScheduler::new(n_steps, 1000, scheduler_config);
 
     let clip_config = stable_diffusion::clip_config();
     let tokenizer = clip::Tokenizer::create("data/bpe_simple_vocab_16e6.txt", &clip_config)?;

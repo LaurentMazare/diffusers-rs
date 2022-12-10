@@ -23,13 +23,15 @@ impl Module for Activation {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Config {
     vocab_size: i64,
     embed_dim: i64,         // aka config.hidden_size
     activation: Activation, // aka config.hidden_act
     intermediate_size: i64,
     max_position_embeddings: usize,
+    // The character to use for padding, use EOS when not set.
+    pad_with: Option<String>,
     num_hidden_layers: i64,
     num_attention_heads: i64,
     #[allow(dead_code)]
@@ -45,6 +47,7 @@ impl Config {
             embed_dim: 768,
             intermediate_size: 3072,
             max_position_embeddings: 77,
+            pad_with: None,
             num_hidden_layers: 12,
             num_attention_heads: 12,
             projection_dim: 768,
@@ -59,6 +62,7 @@ impl Config {
             embed_dim: 1024,
             intermediate_size: 4096,
             max_position_embeddings: 77,
+            pad_with: Some("!".to_string()),
             num_hidden_layers: 23,
             num_attention_heads: 16,
             projection_dim: 512,
@@ -339,7 +343,7 @@ pub struct Tokenizer {
     bpe_ranks: HashMap<(String, String), usize>,
     start_of_text_token: usize,
     end_of_text_token: usize,
-    max_position_embeddings: usize,
+    config: Config,
 }
 
 impl Tokenizer {
@@ -388,7 +392,7 @@ impl Tokenizer {
             decoder,
             start_of_text_token,
             end_of_text_token,
-            max_position_embeddings: c.max_position_embeddings,
+            config: c.clone(),
         };
         Ok(tokenizer)
     }
@@ -458,12 +462,20 @@ impl Tokenizer {
         match pad_size_to {
             None => bpe_tokens.push(self.end_of_text_token),
             Some(pad_size_to) => {
+                bpe_tokens.push(self.end_of_text_token);
                 bpe_tokens.resize_with(
                     std::cmp::min(bpe_tokens.len(), pad_size_to - 1),
                     Default::default,
                 );
+                let pad_with = match &self.config.pad_with {
+                    None => self.end_of_text_token,
+                    Some(pad_with) => match self.encoder.get(pad_with) {
+                        None => anyhow::bail!("no encoding for padding character {}", pad_with),
+                        Some(v) => *v,
+                    },
+                };
                 while bpe_tokens.len() < pad_size_to {
-                    bpe_tokens.push(self.end_of_text_token)
+                    bpe_tokens.push(pad_with)
                 }
             }
         }
@@ -472,7 +484,7 @@ impl Tokenizer {
 
     /// The main tokenization entry point, takes as input a string and returns the list of tokens.
     pub fn encode(&self, s: &str) -> anyhow::Result<Vec<usize>> {
-        self.encode_pad(s, Some(self.max_position_embeddings))
+        self.encode_pad(s, Some(self.config.max_position_embeddings))
     }
 
     /// The inverse of the tokenization process, takes as input a list of tokens and returns a
