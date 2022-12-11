@@ -78,7 +78,7 @@ struct Args {
     #[arg(long, value_name = "FILE", default_value = "sd_final.png")]
     final_image: String,
 
-    #[arg(long, value_enum, default_value = "v2-1")]
+    #[arg(long, value_enum, default_value = "v1-5")]
     sd_version: StableDiffusionVersion,
 }
 

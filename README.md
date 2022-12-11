@@ -14,10 +14,11 @@ The `diffusers` crate is a Rust equivalent to Huggingface's amazing
 [diffusers](https://github.com/huggingface/diffusers) Python library.
 It is based on the [tch crate](https://github.com/LaurentMazare/tch-rs/).
 The implementation is complete enough so as to be able to run Stable Diffusion
-v1.5.
+v1.5 and v2.1.
 
-In order to run the models, one has to get the weights from this [huggingface
-model repo](https://huggingface.co/lmz/rust-stable-diffusion-v1-5), move them in
+In order to run the models, one has to get the weights from the huggingface
+model repo [v2.1](https://huggingface.co/lmz/rust-stable-diffusion-v2-1)
+or [v1.5](https://huggingface.co/lmz/rust-stable-diffusion-v1-5), move them in
 the `data/` directory and then can run the following command.
 
 ```bash
@@ -95,9 +96,13 @@ be changed via the `-prompt` flag.
 ## Converting the Original Weight Files
 
 The weights can be retrieved as `.ot` files from
-[huggingface](https://huggingface.co/lmz/rust-stable-diffusion-v1-5).
+huggingface [v2.1](https://huggingface.co/lmz/rust-stable-diffusion-v2-1).
+or [v1.5](https://huggingface.co/lmz/rust-stable-diffusion-v1-5).
 It is also possible to download the weights for the original stable diffusion
-model and convert them to `.ot` files by following the instructions below.
+model and convert them to `.ot` files by following the instructions below, these
+instructions are for version 1.5 but can easily be adapted for version 2.1
+using this [model repo](https://huggingface.co/stabilityai/stable-diffusion-2-1)
+instead.
 
 First get the vocabulary file and uncompress it.
 
