@@ -28,10 +28,6 @@ name = "stable-diffusion"
 required-features = ["clap"]
 
 [[example]]
-name = "stable-diffusion-2"
-required-features = ["clap"]
-
-[[example]]
 name = "stable-diffusion-img2img"
 required-features = ["clap"]
 
