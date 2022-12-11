@@ -4,13 +4,44 @@
 // - The "Grokking Stable Diffusion" notebook by Jonathan Whitaker.
 // https://colab.research.google.com/drive/1dlgggNa5Mz8sEAGU0wFCHhGLFooW_pf1?usp=sharing
 //
-// In order to run this, first download the following and extract the file in data/
+// In order to run this, the weights first have to be downloaded and converted by following
+// the instructions below.
 //
 // mkdir -p data && cd data
 // wget https://github.com/openai/CLIP/raw/main/clip/bpe_simple_vocab_16e6.txt.gz
 // gunzip bpe_simple_vocab_16e6.txt.gz
 //
-// Download and convert the weights:
+// Getting the weights then depend on the stable diffusion version (1.5 or 2.1).
+//
+// # How to get the weights for Stable Diffusion 2.1.
+//
+// 1. Clip Encoding Weights
+// wget https://huggingface.co/stabilityai/stable-diffusion-2-1/resolve/fp16/text_encoder/pytorch_model.bin -O clip.bin
+// From python, extract the weights and save them as a .npz file.
+//   import numpy as np
+//   import torch
+//   model = torch.load("./clip.bin")
+//   np.savez("./clip_v2.1.npz", **{k: v.numpy() for k, v in model.items() if "text_model" in k})
+//
+// Then use tensor-tools from the tch-rs repo to convert this to a .ot file that tch can use.
+// In the tch-rs repo (https://github.com/LaurentMazare/tch-rs):
+//   cargo run --release --example tensor-tools cp ./data/clip_v2.1.npz ./data/clip_v2.1.ot
+//
+// 2. VAE and Unet Weights
+// wget https://huggingface.co/stabilityai/stable-diffusion-2-1/resolve/fp16/vae/diffusion_pytorch_model.bin -O vae.bin
+// wget https://huggingface.co/stabilityai/stable-diffusion-2-1/resolve/fp16/unet/diffusion_pytorch_model.bin -O unet.bin
+//
+//   import numpy as np
+//   import torch
+//   model = torch.load("./vae.bin")
+//   np.savez("./vae_v2.1.npz", **{k: v.numpy() for k, v in model.items()})
+//   model = torch.load("./unet.bin")
+//   np.savez("./unet_v2.1.npz", **{k: v.numpy() for k, v in model.items()})
+//
+//   cargo run --release --example tensor-tools cp ./data/vae_v2.1.npz ./data/vae_v2.1.ot
+//   cargo run --release --example tensor-tools cp ./data/unet_v2.1.npz ./data/unet_v2.1.ot
+//
+// # How to get the weights for Stable Diffusion 1.5.
 //
 // 1. Clip Encoding Weights
 // wget https://huggingface.co/openai/clip-vit-large-patch14/resolve/main/pytorch_model.bin
@@ -38,16 +69,11 @@
 //   cargo run --release --example tensor-tools cp ./data/vae.npz ./data/vae.ot
 //   cargo run --release --example tensor-tools cp ./data/unet.npz ./data/unet.ot
 use clap::Parser;
-use diffusers::pipelines::stable_diffusion::v1_5 as stable_diffusion;
-use diffusers::{schedulers::ddim, transformers::clip};
+use diffusers::pipelines::stable_diffusion;
+use diffusers::transformers::clip;
 use tch::{nn::Module, Device, Kind, Tensor};
 
-const HEIGHT: i64 = 512;
-const WIDTH: i64 = 512;
 const GUIDANCE_SCALE: f64 = 7.5;
-
-// TODO: LMSDiscreteScheduler
-// https://github.com/huggingface/diffusers/blob/32bf4fdc4386809c870528cb261028baae012d27/src/diffusers/schedulers/scheduling_lms_discrete.py#L47
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -57,7 +83,7 @@ struct Args {
         long,
         default_value = "A very realistic photo of a rusty robot walking on a sandy beach"
     )]
-    prompt: Option<String>,
+    prompt: String,
 
     /// When set, use the CPU for the listed devices, can be 'all', 'unet', 'clip', etc.
     /// Multiple values can be set.
@@ -65,16 +91,20 @@ struct Args {
     cpu: Vec<String>,
 
     /// The UNet weight file, in .ot format.
-    #[arg(long, value_name = "FILE", default_value = "data/unet.ot")]
-    unet_weights: String,
+    #[arg(long, value_name = "FILE")]
+    unet_weights: Option<String>,
 
     /// The CLIP weight file, in .ot format.
-    #[arg(long, value_name = "FILE", default_value = "data/pytorch_model.ot")]
-    clip_weights: String,
+    #[arg(long, value_name = "FILE")]
+    clip_weights: Option<String>,
 
     /// The VAE weight file, in .ot format.
-    #[arg(long, value_name = "FILE", default_value = "data/vae.ot")]
-    vae_weights: String,
+    #[arg(long, value_name = "FILE")]
+    vae_weights: Option<String>,
+
+    #[arg(long, value_name = "FILE", default_value = "data/bpe_simple_vocab_16e6.txt")]
+    /// The file specifying the vocabulary to used for tokenization.
+    vocab_file: String,
 
     /// The size of the sliced attention or 0 to disable slicing (default)
     #[arg(long)]
@@ -99,25 +129,76 @@ struct Args {
     /// Use autocast (disabled by default as it may use more memory in some cases).
     #[arg(long, action)]
     autocast: bool,
+
+    #[arg(long, value_enum, default_value = "v2-1")]
+    sd_version: StableDiffusionVersion,
+}
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum StableDiffusionVersion {
+    V1_5,
+    V2_1,
+}
+
+impl Args {
+    fn clip_weights(&self) -> String {
+        match &self.clip_weights {
+            Some(w) => w.clone(),
+            None => match self.sd_version {
+                StableDiffusionVersion::V1_5 => "data/pytorch_model.ot".to_string(),
+                StableDiffusionVersion::V2_1 => "data/clip_v2.1.ot".to_string(),
+            },
+        }
+    }
+
+    fn vae_weights(&self) -> String {
+        match &self.vae_weights {
+            Some(w) => w.clone(),
+            None => match self.sd_version {
+                StableDiffusionVersion::V1_5 => "data/vae.ot".to_string(),
+                StableDiffusionVersion::V2_1 => "data/vae_v2.1.ot".to_string(),
+            },
+        }
+    }
+
+    fn unet_weights(&self) -> String {
+        match &self.unet_weights {
+            Some(w) => w.clone(),
+            None => match self.sd_version {
+                StableDiffusionVersion::V1_5 => "data/unet.ot".to_string(),
+                StableDiffusionVersion::V2_1 => "data/unet_v2.1.ot".to_string(),
+            },
+        }
+    }
 }
 
 fn run(args: Args) -> anyhow::Result<()> {
+    let clip_weights = args.clip_weights();
+    let vae_weights = args.vae_weights();
+    let unet_weights = args.unet_weights();
     let Args {
         prompt,
         cpu,
         n_steps,
         seed,
+        vocab_file,
         final_image,
-        vae_weights,
-        clip_weights,
-        unet_weights,
         sliced_attention_size,
         num_samples,
-        autocast: _,
+        sd_version,
+        ..
     } = args;
     tch::maybe_init_cuda();
     println!("Cuda available: {}", tch::Cuda::is_available());
     println!("Cudnn available: {}", tch::Cuda::cudnn_is_available());
+    let sd_config = match sd_version {
+        StableDiffusionVersion::V1_5 => {
+            stable_diffusion::StableDiffusionConfig::v1_5(sliced_attention_size)
+        }
+        StableDiffusionVersion::V2_1 => {
+            stable_diffusion::StableDiffusionConfig::v2_1(sliced_attention_size)
+        }
+    };
     let cuda_device = Device::cuda_if_available();
     let cpu_or_cuda = |name: &str| {
         if cpu.iter().any(|c| c == "all" || c == name) {
@@ -129,13 +210,9 @@ fn run(args: Args) -> anyhow::Result<()> {
     let clip_device = cpu_or_cuda("clip");
     let vae_device = cpu_or_cuda("vae");
     let unet_device = cpu_or_cuda("unet");
-    let scheduler = ddim::DDIMScheduler::new(n_steps, 1000, Default::default());
+    let scheduler = sd_config.build_scheduler(n_steps);
 
-    let clip_config = stable_diffusion::clip_config();
-    let tokenizer = clip::Tokenizer::create("data/bpe_simple_vocab_16e6.txt", &clip_config)?;
-    let prompt = prompt.unwrap_or_else(|| {
-        "A very realistic photo of a rusty robot walking on a sandy beach".to_string()
-    });
+    let tokenizer = clip::Tokenizer::create(&vocab_file, &sd_config.clip)?;
     println!("Running with prompt \"{prompt}\".");
     let tokens = tokenizer.encode(&prompt)?;
     let tokens: Vec<i64> = tokens.into_iter().map(|x| x as i64).collect();
@@ -147,25 +224,23 @@ fn run(args: Args) -> anyhow::Result<()> {
     let no_grad_guard = tch::no_grad_guard();
 
     println!("Building the Clip transformer.");
-    let text_model = diffusers::pipelines::stable_diffusion::build_clip_transformer(
-        &clip_weights,
-        &clip_config,
-        clip_device,
-    )?;
+    let text_model = sd_config.build_clip_transformer(&clip_weights, clip_device)?;
     let text_embeddings = text_model.forward(&tokens);
     let uncond_embeddings = text_model.forward(&uncond_tokens);
     let text_embeddings = Tensor::cat(&[uncond_embeddings, text_embeddings], 0).to(unet_device);
 
     println!("Building the autoencoder.");
-    let vae = stable_diffusion::build_vae(&vae_weights, vae_device)?;
+    let vae = sd_config.build_vae(&vae_weights, vae_device)?;
     println!("Building the unet.");
-    let unet = stable_diffusion::build_unet(&unet_weights, unet_device, 4, sliced_attention_size)?;
+    let unet = sd_config.build_unet(&unet_weights, unet_device, 4)?;
 
     let bsize = 1;
     for idx in 0..num_samples {
         tch::manual_seed(seed + idx);
-        let mut latents =
-            Tensor::randn(&[bsize, 4, HEIGHT / 8, WIDTH / 8], (Kind::Float, unet_device));
+        let mut latents = Tensor::randn(
+            &[bsize, 4, sd_config.height / 8, sd_config.width / 8],
+            (Kind::Float, unet_device),
+        );
 
         for (timestep_index, &timestep) in scheduler.timesteps().iter().enumerate() {
             println!("Timestep {timestep_index}/{n_steps}");
