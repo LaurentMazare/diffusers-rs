@@ -39,6 +39,7 @@ pub struct DDIMSchedulerConfig {
     /// Adjust the indexes of the inference schedule by this value.
     pub steps_offset: usize,
     pub prediction_type: PredictionType,
+    pub train_timesteps: usize,
 }
 
 impl Default for DDIMSchedulerConfig {
@@ -50,6 +51,7 @@ impl Default for DDIMSchedulerConfig {
             eta: 0.,
             steps_offset: 1,
             prediction_type: PredictionType::Epsilon,
+            train_timesteps: 1000,
         }
     }
 }
@@ -68,12 +70,8 @@ impl DDIMScheduler {
     /// Creates a new DDIM scheduler given the number of steps to be
     /// used for inference as well as the number of steps that was used
     /// during training.
-    pub fn new(
-        inference_steps: usize,
-        train_timesteps: usize,
-        config: DDIMSchedulerConfig,
-    ) -> Self {
-        let step_ratio = train_timesteps / inference_steps;
+    pub fn new(inference_steps: usize, config: DDIMSchedulerConfig) -> Self {
+        let step_ratio = config.train_timesteps / inference_steps;
         let timesteps: Vec<usize> = (0..(inference_steps))
             .map(|s| (s * step_ratio) as usize + config.steps_offset)
             .rev()
@@ -82,14 +80,14 @@ impl DDIMScheduler {
             BetaSchedule::ScaledLinear => Tensor::linspace(
                 config.beta_start.sqrt(),
                 config.beta_end.sqrt(),
-                train_timesteps as i64,
+                config.train_timesteps as i64,
                 kind::FLOAT_CPU,
             )
             .square(),
             BetaSchedule::Linear => Tensor::linspace(
                 config.beta_start,
                 config.beta_end,
-                train_timesteps as i64,
+                config.train_timesteps as i64,
                 kind::FLOAT_CPU,
             ),
         };

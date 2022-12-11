@@ -1,6 +1,6 @@
 [package]
 name = "diffusers"
-version = "0.1.4"
+version = "0.2.0"
 authors = ["Laurent Mazare <lmazare@gmail.com>"]
 edition = "2021"
 
@@ -25,10 +25,6 @@ clap = { version = "4.0.19", optional = true, features = ["derive"] }
 
 [[example]]
 name = "stable-diffusion"
-required-features = ["clap"]
-
-[[example]]
-name = "stable-diffusion-2"
 required-features = ["clap"]
 
 [[example]]
