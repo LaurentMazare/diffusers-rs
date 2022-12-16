@@ -238,7 +238,7 @@ fn run(args: Args) -> anyhow::Result<()> {
         } else {
             final_image.clone()
         };
-        tch::vision::image::save(&image, &final_image)?;
+        tch::vision::image::save(&image, final_image)?;
     }
 
     drop(no_grad_guard);

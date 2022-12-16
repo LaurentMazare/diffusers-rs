@@ -212,7 +212,7 @@ fn run(args: Args) -> anyhow::Result<()> {
     let unet_device = cpu_or_cuda("unet");
     let scheduler = sd_config.build_scheduler(n_steps);
 
-    let tokenizer = clip::Tokenizer::create(&vocab_file, &sd_config.clip)?;
+    let tokenizer = clip::Tokenizer::create(vocab_file, &sd_config.clip)?;
     println!("Running with prompt \"{prompt}\".");
     let tokens = tokenizer.encode(&prompt)?;
     let tokens: Vec<i64> = tokens.into_iter().map(|x| x as i64).collect();
@@ -268,7 +268,7 @@ fn run(args: Args) -> anyhow::Result<()> {
         } else {
             final_image.clone()
         };
-        tch::vision::image::save(&image, &final_image)?;
+        tch::vision::image::save(&image, final_image)?;
     }
 
     drop(no_grad_guard);
