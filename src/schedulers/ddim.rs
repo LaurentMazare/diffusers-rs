@@ -72,10 +72,8 @@ impl DDIMScheduler {
     /// during training.
     pub fn new(inference_steps: usize, config: DDIMSchedulerConfig) -> Self {
         let step_ratio = config.train_timesteps / inference_steps;
-        let timesteps: Vec<usize> = (0..(inference_steps))
-            .map(|s| (s * step_ratio) as usize + config.steps_offset)
-            .rev()
-            .collect();
+        let timesteps: Vec<usize> =
+            (0..(inference_steps)).map(|s| s * step_ratio + config.steps_offset).rev().collect();
         let betas = match config.beta_schedule {
             BetaSchedule::ScaledLinear => Tensor::linspace(
                 config.beta_start.sqrt(),
