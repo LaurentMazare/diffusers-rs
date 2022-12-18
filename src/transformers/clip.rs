@@ -449,7 +449,11 @@ impl Tokenizer {
             }
             word = new_word
         }
-        word.iter().map(|x| *self.encoder.get(x).unwrap()).collect()
+        word.iter()
+            .map(|x| self.encoder.get(x))
+            .flatten()
+            .map(|x| *x)
+            .collect()
     }
 
     pub fn encode_pad(&self, s: &str, pad_size_to: Option<usize>) -> anyhow::Result<Vec<usize>> {
