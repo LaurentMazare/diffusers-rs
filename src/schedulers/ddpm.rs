@@ -1,5 +1,5 @@
 use tch::{Tensor, kind, Kind, IndexOp};
-use super::{betas_for_alpha_bar, BetaSchedule};
+use super::{BetaSchedule, PredictionType, betas_for_alpha_bar};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DDPMVarianceType {
@@ -15,15 +15,6 @@ impl Default for DDPMVarianceType {
     fn default() -> Self {
         Self::FixedSmall
     }
-}
-
-/// prediction type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PredictionType {
-    /// predict epsilon (noise)
-    Epsilon,
-    /// predict sample (data / `x0`)
-    Sample
 }
 
 /// Additional configuration for the [`DDPMScheduler`].
@@ -132,12 +123,6 @@ impl DDPMScheduler {
     }
 
     pub fn step(&self, model_output: &Tensor, timestep: usize, sample: &Tensor) -> Tensor {
-/*        let timestep = self
-            .timesteps
-            .iter()
-            .position(|&p| p == timestep)
-            .unwrap();*/
-
         // 1. compute alphas, betas
         let alpha_prod_t = self.alphas_cumprod[timestep];
         let alpha_prod_t_prev = if timestep > 0 { self.alphas_cumprod[timestep - 1] } else { 1.0 };
@@ -147,7 +132,8 @@ impl DDPMScheduler {
         // 2. compute predicted original sample from predicted noise also called "predicted x_0" of formula (15)
         let mut pred_original_sample = match self.config.prediction_type {
             PredictionType::Epsilon => (sample - beta_prod_t.sqrt() * model_output) / alpha_prod_t.sqrt(),
-            PredictionType::Sample => model_output.shallow_clone()
+            PredictionType::Sample => model_output.shallow_clone(),
+            _ => unimplemented!()
         };
 
         // 3. clip predicted x_0
@@ -179,11 +165,8 @@ impl DDPMScheduler {
     }
 
     fn add_noise(&mut self, original_samples: Tensor, noise: Tensor, timestep: f64) -> Tensor {
-        let timestep: usize = self.timesteps
-            .iter()
-            .position(|&p| p == timestep as usize)
-            .unwrap();
-        self.alphas_cumprod[timestep].sqrt() * original_samples + (1.0 - self.alphas_cumprod[timestep]).sqrt() * noise
+        self.alphas_cumprod[timestep].sqrt() * original_samples +
+            (1. - self.alphas_cumprod[timestep]).sqrt() * noise
     }
 
     fn init_noise_sigma(&self) -> f64 {

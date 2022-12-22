@@ -21,6 +21,13 @@ pub enum BetaSchedule {
     SquaredcosCapV2
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum PredictionType {
+    Epsilon,
+    VPrediction,
+    Sample
+}
+
 /// Create a beta schedule that discretizes the given alpha_t_bar function, which defines the cumulative product of
 /// `(1-beta)` over time from `t = [0,1]`.
 ///

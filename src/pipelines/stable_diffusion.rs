@@ -2,6 +2,7 @@ use crate::models::{unet_2d, vae};
 use crate::schedulers::ddim;
 use crate::transformers::clip;
 use tch::{nn, Device};
+use crate::schedulers::PredictionType;
 
 #[derive(Clone, Debug)]
 pub struct StableDiffusionConfig {
@@ -85,7 +86,7 @@ impl StableDiffusionConfig {
             norm_num_groups: 32,
         };
         let scheduler = ddim::DDIMSchedulerConfig {
-            prediction_type: ddim::PredictionType::VPrediction,
+            prediction_type: PredictionType::VPrediction,
             ..Default::default()
         };
         Self { width: 768, height: 768, clip: clip::Config::v2_1(), autoencoder, scheduler, unet }

@@ -8,14 +8,9 @@
 //! Denoising Diffusion Implicit Models, J. Song et al, 2020.
 //! https://arxiv.org/abs/2010.02502
 use tch::{kind, Kind, Tensor};
-use super::{BetaSchedule, betas_for_alpha_bar};
+use super::{BetaSchedule, PredictionType, betas_for_alpha_bar};
 
 
-#[derive(Debug, Clone, Copy)]
-pub enum PredictionType {
-    Epsilon,
-    VPrediction,
-}
 
 /// The configuration for the DDIM scheduler.
 #[derive(Debug, Clone, Copy)]
@@ -114,6 +109,10 @@ impl DDIMScheduler {
                     alpha_prod_t.sqrt() * sample - beta_prod_t.sqrt() * model_output;
                 let model_output = alpha_prod_t.sqrt() * model_output + beta_prod_t.sqrt() * sample;
                 (pred_original_sample, model_output)
+            }
+            PredictionType::Sample => {
+                let pred_original_sample = model_output.shallow_clone();
+                (pred_original_sample, model_output.shallow_clone())
             }
         };
 
