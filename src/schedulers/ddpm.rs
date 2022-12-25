@@ -1,4 +1,4 @@
-use tch::{Tensor, kind, Kind, IndexOp};
+use tch::{Tensor, kind, Kind};
 use super::{BetaSchedule, PredictionType, betas_for_alpha_bar};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,6 +85,10 @@ impl DDPMScheduler {
         let alphas: Tensor = 1. - &betas;
         let alphas_cumprod = Vec::<f64>::from(alphas.cumprod(0, Kind::Double));
 
+        // min(train_timesteps, inference_steps)
+        // https://github.com/huggingface/diffusers/blob/8331da46837be40f96fbd24de6a6fb2da28acd11/src/diffusers/schedulers/scheduling_ddpm.py#L187
+        let inference_steps = inference_steps.min(config.train_timesteps);
+        // arange the number of the scheduler's timesteps
         let step_ratio = config.train_timesteps / inference_steps;
         let timesteps: Vec<usize> =
             (0..(config.train_timesteps)).step_by(step_ratio).rev().collect();
@@ -137,7 +141,7 @@ impl DDPMScheduler {
 
         // 3. clip predicted x_0
         if self.config.clip_sample {
-            pred_original_sample = pred_original_sample.clamp(-1, 1);
+            pred_original_sample = pred_original_sample.clamp(-1., 1.);
         }
 
         // 4. Compute coefficients for pred_original_sample x_0 and current sample x_t
@@ -152,7 +156,7 @@ impl DDPMScheduler {
         // 6. Add noise
         let mut variance = Tensor::zeros(&pred_prev_sample.size(), kind::FLOAT_CPU);
         if timestep > 0 {
-            let variance_noise = Tensor::randn_like(&model_output);
+            let variance_noise = Tensor::randn_like(model_output);
             if self.config.variance_type == DDPMVarianceType::FixedSmallLog {
                 variance = self.get_variance(timestep) * variance_noise;
             } else {
@@ -160,17 +164,17 @@ impl DDPMScheduler {
             }
         }
 
-        let prev_sample = pred_prev_sample + variance;
+        let prev_sample = &pred_prev_sample + variance;
 
         prev_sample
     }
 
-    fn add_noise(&mut self, original_samples: Tensor, noise: Tensor, timestep: usize) -> Tensor {
+    pub fn add_noise(&self, original_samples: &Tensor, noise:Tensor, timestep: usize) -> Tensor {
         self.alphas_cumprod[timestep].sqrt() * original_samples +
             (1. - self.alphas_cumprod[timestep]).sqrt() * noise
     }
 
-    fn init_noise_sigma(&self) -> f64 {
+    pub fn init_noise_sigma(&self) -> f64 {
         self.init_noise_sigma
     }
 }
