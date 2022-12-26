@@ -106,14 +106,13 @@ impl DDPMScheduler {
 
         let variance = (1. - alpha_prod_t_prev) / (1. - alpha_prod_t) * self.betas[timestep];
 
-        let var = match self.config.variance_type {
+        match self.config.variance_type {
             DDPMVarianceType::FixedSmall => variance.max(1e-20),
             DDPMVarianceType::FixedSmallLog => variance.max(1e-20).log(std::f64::consts::E),
             DDPMVarianceType::FixedLarge => self.betas[timestep],
             DDPMVarianceType::FixedLargeLog => self.betas[timestep].log(std::f64::consts::E),
             DDPMVarianceType::Learned => variance,
-        };
-        var
+        }
     }
 
     pub fn timesteps(&self) -> &[usize] {
@@ -164,10 +163,7 @@ impl DDPMScheduler {
                 variance = self.get_variance(timestep).sqrt() * variance_noise;
             }
         }
-
-        let prev_sample = &pred_prev_sample + variance;
-
-        prev_sample
+        &pred_prev_sample + variance
     }
 
     pub fn add_noise(&self, original_samples: &Tensor, noise: Tensor, timestep: usize) -> Tensor {
