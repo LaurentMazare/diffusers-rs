@@ -1,8 +1,8 @@
 use crate::models::{unet_2d, vae};
 use crate::schedulers::ddim;
+use crate::schedulers::PredictionType;
 use crate::transformers::clip;
 use tch::{nn, Device};
-use crate::schedulers::PredictionType;
 
 #[derive(Clone, Debug)]
 pub struct StableDiffusionConfig {

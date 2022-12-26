@@ -8,7 +8,6 @@ use tch::Tensor;
 pub mod ddim;
 pub mod ddpm;
 
-
 /// This represents how beta ranges from its minimum value to the maximum
 /// during training.
 #[derive(Debug, Clone, Copy)]
@@ -18,14 +17,14 @@ pub enum BetaSchedule {
     /// Linear interpolation of the square root of beta.
     ScaledLinear,
     /// Glide cosine schedule
-    SquaredcosCapV2
+    SquaredcosCapV2,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub enum PredictionType {
     Epsilon,
     VPrediction,
-    Sample
+    Sample,
 }
 
 /// Create a beta schedule that discretizes the given alpha_t_bar function, which defines the cumulative product of
@@ -33,13 +32,10 @@ pub enum PredictionType {
 ///
 /// Contains a function `alpha_bar` that takes an argument `t` and transforms it to the cumulative product of `(1-beta)`
 /// up to that part of the diffusion process.
-pub(crate) fn betas_for_alpha_bar(
-    num_diffusion_timesteps: usize,
-    max_beta: f64
-) -> Tensor
-{
-    let alpha_bar
-        = |time_step: usize| f64::cos((time_step as f64 + 0.008) / 1.008 * std::f64::consts::FRAC_PI_2).powi(2);
+pub(crate) fn betas_for_alpha_bar(num_diffusion_timesteps: usize, max_beta: f64) -> Tensor {
+    let alpha_bar = |time_step: usize| {
+        f64::cos((time_step as f64 + 0.008) / 1.008 * std::f64::consts::FRAC_PI_2).powi(2)
+    };
     let mut betas = Vec::with_capacity(num_diffusion_timesteps);
     for i in 0..num_diffusion_timesteps {
         let t1 = i / num_diffusion_timesteps;
@@ -49,5 +45,3 @@ pub(crate) fn betas_for_alpha_bar(
 
     Tensor::of_slice(&betas)
 }
-
-

@@ -1,5 +1,5 @@
-use tch::{Tensor, kind, Kind};
-use super::{BetaSchedule, PredictionType, betas_for_alpha_bar};
+use super::{betas_for_alpha_bar, BetaSchedule, PredictionType};
+use tch::{kind, Kind, Tensor};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DDPMVarianceType {
@@ -7,9 +7,8 @@ pub enum DDPMVarianceType {
     FixedSmallLog,
     FixedLarge,
     FixedLargeLog,
-    Learned
+    Learned,
 }
-
 
 impl Default for DDPMVarianceType {
     fn default() -> Self {
@@ -47,7 +46,6 @@ impl Default for DDPMSchedulerConfig {
     }
 }
 
-
 pub struct DDPMScheduler {
     alphas: Vec<f64>,
     betas: Vec<f64>,
@@ -58,17 +56,15 @@ pub struct DDPMScheduler {
 }
 
 impl DDPMScheduler {
-    pub fn new(
-        inference_steps: usize,
-        config: DDPMSchedulerConfig
-    ) -> Self {
+    pub fn new(inference_steps: usize, config: DDPMSchedulerConfig) -> Self {
         let betas = match config.beta_schedule {
             BetaSchedule::ScaledLinear => Tensor::linspace(
                 config.beta_start.sqrt(),
                 config.beta_end.sqrt(),
                 config.train_timesteps as i64,
                 kind::FLOAT_CPU,
-            ).square(),
+            )
+            .square(),
 
             BetaSchedule::Linear => Tensor::linspace(
                 config.beta_start,
@@ -77,8 +73,7 @@ impl DDPMScheduler {
                 kind::FLOAT_CPU,
             ),
 
-            BetaSchedule::SquaredcosCapV2 =>
-                betas_for_alpha_bar(config.train_timesteps, 0.999)
+            BetaSchedule::SquaredcosCapV2 => betas_for_alpha_bar(config.train_timesteps, 0.999),
         };
 
         // &betas to avoid moving it
@@ -134,9 +129,13 @@ impl DDPMScheduler {
 
         // 2. compute predicted original sample from predicted noise also called "predicted x_0" of formula (15)
         let mut pred_original_sample = match self.config.prediction_type {
-            PredictionType::Epsilon => (sample - beta_prod_t.sqrt() * model_output) / alpha_prod_t.sqrt(),
+            PredictionType::Epsilon => {
+                (sample - beta_prod_t.sqrt() * model_output) / alpha_prod_t.sqrt()
+            }
             PredictionType::Sample => model_output.shallow_clone(),
-            PredictionType::VPrediction => alpha_prod_t.sqrt() * sample - beta_prod_t.sqrt() * model_output
+            PredictionType::VPrediction => {
+                alpha_prod_t.sqrt() * sample - beta_prod_t.sqrt() * model_output
+            }
         };
 
         // 3. clip predicted x_0
@@ -146,12 +145,14 @@ impl DDPMScheduler {
 
         // 4. Compute coefficients for pred_original_sample x_0 and current sample x_t
         // See formula (7) from https://arxiv.org/pdf/2006.11239.pdf
-        let pred_original_sample_coeff = (alpha_prod_t_prev.sqrt() * self.betas[timestep]) / beta_prod_t;
+        let pred_original_sample_coeff =
+            (alpha_prod_t_prev.sqrt() * self.betas[timestep]) / beta_prod_t;
         let current_sample_coeff = self.alphas[timestep].sqrt() * beta_prod_t_prev / beta_prod_t;
 
         // 5. Compute predicted previous sample µ_t
         // See formula (7) from https://arxiv.org/pdf/2006.11239.pdf
-        let pred_prev_sample = pred_original_sample_coeff * &pred_original_sample + current_sample_coeff * sample;
+        let pred_prev_sample =
+            pred_original_sample_coeff * &pred_original_sample + current_sample_coeff * sample;
 
         // 6. Add noise
         let mut variance = Tensor::zeros(&pred_prev_sample.size(), kind::FLOAT_CPU);
@@ -169,9 +170,9 @@ impl DDPMScheduler {
         prev_sample
     }
 
-    pub fn add_noise(&self, original_samples: &Tensor, noise:Tensor, timestep: usize) -> Tensor {
-        self.alphas_cumprod[timestep].sqrt() * original_samples +
-            (1. - self.alphas_cumprod[timestep]).sqrt() * noise
+    pub fn add_noise(&self, original_samples: &Tensor, noise: Tensor, timestep: usize) -> Tensor {
+        self.alphas_cumprod[timestep].sqrt() * original_samples
+            + (1. - self.alphas_cumprod[timestep]).sqrt() * noise
     }
 
     pub fn init_noise_sigma(&self) -> f64 {
