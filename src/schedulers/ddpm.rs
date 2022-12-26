@@ -88,13 +88,11 @@ impl DDPMScheduler {
         let timesteps: Vec<usize> =
             (0..(config.train_timesteps)).step_by(step_ratio).rev().collect();
 
-        let init_noise_sigma = 1.0;
-
         Self {
             alphas: Vec::<f64>::from(alphas),
             betas: Vec::<f64>::from(betas),
             alphas_cumprod,
-            init_noise_sigma,
+            init_noise_sigma: 1.0,
             timesteps,
             config,
         }
@@ -108,9 +106,9 @@ impl DDPMScheduler {
 
         match self.config.variance_type {
             DDPMVarianceType::FixedSmall => variance.max(1e-20),
-            DDPMVarianceType::FixedSmallLog => variance.max(1e-20).log(std::f64::consts::E),
+            DDPMVarianceType::FixedSmallLog => variance.max(1e-20).ln(),
             DDPMVarianceType::FixedLarge => self.betas[timestep],
-            DDPMVarianceType::FixedLargeLog => self.betas[timestep].log(std::f64::consts::E),
+            DDPMVarianceType::FixedLargeLog => self.betas[timestep].ln(),
             DDPMVarianceType::Learned => variance,
         }
     }
@@ -120,6 +118,7 @@ impl DDPMScheduler {
     }
 
     pub fn step(&self, model_output: &Tensor, timestep: usize, sample: &Tensor) -> Tensor {
+        // https://github.com/huggingface/diffusers/blob/df2b548e893ccb8a888467c2508756680df22821/src/diffusers/schedulers/scheduling_ddpm.py#L272
         // 1. compute alphas, betas
         let alpha_prod_t = self.alphas_cumprod[timestep];
         let alpha_prod_t_prev = if timestep > 0 { self.alphas_cumprod[timestep - 1] } else { 1.0 };
@@ -153,6 +152,7 @@ impl DDPMScheduler {
         let pred_prev_sample =
             pred_original_sample_coeff * &pred_original_sample + current_sample_coeff * sample;
 
+        // https://github.com/huggingface/diffusers/blob/df2b548e893ccb8a888467c2508756680df22821/src/diffusers/schedulers/scheduling_ddpm.py#L305
         // 6. Add noise
         let mut variance = Tensor::zeros(&pred_prev_sample.size(), kind::FLOAT_CPU);
         if timestep > 0 {
