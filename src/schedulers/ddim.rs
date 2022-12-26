@@ -8,22 +8,9 @@
 //! Denoising Diffusion Implicit Models, J. Song et al, 2020.
 //! https://arxiv.org/abs/2010.02502
 use tch::{kind, Kind, Tensor};
+use super::{BetaSchedule, PredictionType, betas_for_alpha_bar};
 
-/// This represents how beta ranges from its minimum value to the maximum
-/// during training.
-#[derive(Debug, Clone, Copy)]
-pub enum BetaSchedule {
-    /// Linear interpolation.
-    Linear,
-    /// Linear interpolation of the square root of beta.
-    ScaledLinear,
-}
 
-#[derive(Debug, Clone, Copy)]
-pub enum PredictionType {
-    Epsilon,
-    VPrediction,
-}
 
 /// The configuration for the DDIM scheduler.
 #[derive(Debug, Clone, Copy)]
@@ -88,6 +75,8 @@ impl DDIMScheduler {
                 config.train_timesteps as i64,
                 kind::FLOAT_CPU,
             ),
+            BetaSchedule::SquaredcosCapV2
+                => betas_for_alpha_bar(config.train_timesteps, 0.999)
         };
         let alphas: Tensor = 1.0 - betas;
         let alphas_cumprod = Vec::<f64>::from(alphas.cumprod(0, Kind::Double));
@@ -120,6 +109,10 @@ impl DDIMScheduler {
                     alpha_prod_t.sqrt() * sample - beta_prod_t.sqrt() * model_output;
                 let model_output = alpha_prod_t.sqrt() * model_output + beta_prod_t.sqrt() * sample;
                 (pred_original_sample, model_output)
+            }
+            PredictionType::Sample => {
+                let pred_original_sample = model_output.shallow_clone();
+                (pred_original_sample, model_output.shallow_clone())
             }
         };
 
