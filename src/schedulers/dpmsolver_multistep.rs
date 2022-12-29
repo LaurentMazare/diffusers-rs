@@ -1,5 +1,5 @@
-use super::{BetaSchedule, PredictionType, betas_for_alpha_bar};
-use tch::{Tensor, kind, Kind};
+use super::{betas_for_alpha_bar, BetaSchedule, PredictionType};
+use tch::{kind, Kind, Tensor};
 
 /// The algorithm type for the solver.
 ///
@@ -9,14 +9,14 @@ pub enum DPMSolverAlgorithmType {
     #[default]
     DPMSolverPlusPlus,
     /// Implements the algorithms defined in <https://arxiv.org/abs/2206.00927>.
-    DPMSolver
+    DPMSolver,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub enum DPMSolverType {
     #[default]
     Midpoint,
-    Heun
+    Heun,
 }
 
 #[derive(Debug, Clone)]
@@ -43,7 +43,7 @@ pub struct DPMSolverMultistepSchedulerConfig {
     pub solver_type: DPMSolverType,
     /// Whether to use lower-order solvers in the final steps. Only valid for < 15 inference steps. We empirically
     /// find this can stabilize the sampling of DPM-Solver for `steps < 15`, especially for steps <= 10.
-    pub lower_order_final: bool
+    pub lower_order_final: bool,
 }
 
 impl Default for DPMSolverMultistepSchedulerConfig {
@@ -58,7 +58,7 @@ impl Default for DPMSolverMultistepSchedulerConfig {
             sample_max_value: 1.0,
             algorithm_type: DPMSolverAlgorithmType::DPMSolverPlusPlus,
             solver_type: DPMSolverType::Midpoint,
-            lower_order_final: true
+            lower_order_final: true,
         }
     }
 }
@@ -72,19 +72,19 @@ pub struct DPMSolverMultistepScheduler {
     lower_order_nums: usize,
     model_outputs: Vec<Tensor>,
     timesteps: Vec<usize>,
-    pub config: DPMSolverMultistepSchedulerConfig
+    pub config: DPMSolverMultistepSchedulerConfig,
 }
 
-
 impl DPMSolverMultistepScheduler {
-    pub fn new (inference_steps: usize, config: DPMSolverMultistepSchedulerConfig) -> Self {
+    pub fn new(inference_steps: usize, config: DPMSolverMultistepSchedulerConfig) -> Self {
         let betas = match config.beta_schedule {
             BetaSchedule::ScaledLinear => Tensor::linspace(
                 config.beta_start.sqrt(),
                 config.beta_end.sqrt(),
                 config.train_timesteps as i64,
                 kind::FLOAT_CPU,
-            ).square(),
+            )
+            .square(),
             BetaSchedule::Linear => Tensor::linspace(
                 config.beta_start,
                 config.beta_end,
@@ -100,9 +100,9 @@ impl DPMSolverMultistepScheduler {
         let sigma_t = ((1. - &alphas_cumprod) as Tensor).sqrt();
         let lambda_t = alpha_t.log() - sigma_t.log();
 
-        let step = (config.train_timesteps - 1) as f64 / inference_steps  as f64;
+        let step = (config.train_timesteps - 1) as f64 / inference_steps as f64;
         // np.linspace(0, train_steps - 1, inference_steps + 1).round()[::-1][:-1]
-        let timesteps: Vec<usize> = (0..inference_steps+1)
+        let timesteps: Vec<usize> = (0..inference_steps + 1)
             .map(|i| (i as f64 * step).round() as usize)
             // discards the 0.0 element
             .skip(1)
@@ -124,7 +124,7 @@ impl DPMSolverMultistepScheduler {
             lower_order_nums: 0,
             model_outputs,
             timesteps,
-            config
+            config,
         }
     }
 
@@ -140,7 +140,7 @@ impl DPMSolverMultistepScheduler {
         &self,
         model_output: &Tensor,
         timestep: usize,
-        sample: &Tensor
+        sample: &Tensor,
     ) -> Tensor {
         match self.config.algorithm_type {
             DPMSolverAlgorithmType::DPMSolverPlusPlus => {
@@ -183,17 +183,19 @@ impl DPMSolverMultistepScheduler {
         model_output: Tensor,
         timestep: usize,
         prev_timestep: usize,
-        sample: &Tensor
+        sample: &Tensor,
     ) -> Tensor {
         let (lambda_t, lambda_s) = (self.lambda_t[prev_timestep], self.lambda_t[timestep]);
         let (alpha_t, alpha_s) = (self.alpha_t[prev_timestep], self.alpha_t[timestep]);
         let (sigma_t, sigma_s) = (self.sigma_t[prev_timestep], self.sigma_t[timestep]);
         let h = lambda_t - lambda_s;
         match self.config.algorithm_type {
-            DPMSolverAlgorithmType::DPMSolverPlusPlus =>
-                (sigma_t / sigma_s) * sample - (alpha_t * ((-h).exp() - 1.0)) * model_output,
-            DPMSolverAlgorithmType::DPMSolver =>
+            DPMSolverAlgorithmType::DPMSolverPlusPlus => {
+                (sigma_t / sigma_s) * sample - (alpha_t * ((-h).exp() - 1.0)) * model_output
+            }
+            DPMSolverAlgorithmType::DPMSolver => {
                 (alpha_t / alpha_s) * sample - (sigma_t * (h.exp() - 1.0)) * model_output
+            }
         }
     }
 
@@ -203,12 +205,19 @@ impl DPMSolverMultistepScheduler {
         model_output_list: &Vec<Tensor>,
         timestep_list: [usize; 2],
         prev_timestep: usize,
-        sample: &Tensor
+        sample: &Tensor,
     ) -> Tensor {
-
-        let (t, s0, s1) = (prev_timestep, timestep_list[timestep_list.len() - 1], timestep_list[timestep_list.len() - 2]);
-        let (m0, m1) = (model_output_list[model_output_list.len() - 1].as_ref(), model_output_list[model_output_list.len() - 2].as_ref());
-        let (lambda_t, lambda_s0, lambda_s1) = (self.lambda_t[t], self.lambda_t[s0], self.lambda_t[s1]);
+        let (t, s0, s1) = (
+            prev_timestep,
+            timestep_list[timestep_list.len() - 1],
+            timestep_list[timestep_list.len() - 2],
+        );
+        let (m0, m1) = (
+            model_output_list[model_output_list.len() - 1].as_ref(),
+            model_output_list[model_output_list.len() - 2].as_ref(),
+        );
+        let (lambda_t, lambda_s0, lambda_s1) =
+            (self.lambda_t[t], self.lambda_t[s0], self.lambda_t[s1]);
         let (alpha_t, alpha_s0) = (self.alpha_t[t], self.alpha_t[s0]);
         let (sigma_t, sigma_s0) = (self.sigma_t[t], self.sigma_t[s0]);
         let (h, h_0) = (lambda_t - lambda_s0, lambda_s0 - lambda_s1);
@@ -223,8 +232,7 @@ impl DPMSolverMultistepScheduler {
                         - 0.5 * (alpha_t * ((-h).exp() - 1.0)) * d1
                 }
                 DPMSolverType::Heun => {
-                    (sigma_t / sigma_s0) * sample
-                        - (alpha_t * ((-h).exp() - 1.0)) * d0
+                    (sigma_t / sigma_s0) * sample - (alpha_t * ((-h).exp() - 1.0)) * d0
                         + (alpha_t * (((-h).exp() - 1.0) / h + 1.0)) * d1
                 }
             },
@@ -234,7 +242,7 @@ impl DPMSolverMultistepScheduler {
                     (alpha_t / alpha_s0) * sample
                         - (sigma_t * (h.exp() - 1.0)) * d0
                         - 0.5 * (sigma_t * (h.exp() - 1.0)) * d1
-                }
+                },
                 DPMSolverType::Heun => {
                     (alpha_t / alpha_s0) * sample
                         - (sigma_t * (h.exp() - 1.0)) * d0
@@ -250,16 +258,21 @@ impl DPMSolverMultistepScheduler {
         model_output_list: &Vec<Tensor>,
         timestep_list: [usize; 3],
         prev_timestep: usize,
-        sample: &Tensor
+        sample: &Tensor,
     ) -> Tensor {
-        let (t, s0, s1, s2) =
-            (prev_timestep, timestep_list[timestep_list.len() - 1], timestep_list[timestep_list.len() - 2], timestep_list[timestep_list.len() - 3]);
+        let (t, s0, s1, s2) = (
+            prev_timestep,
+            timestep_list[timestep_list.len() - 1],
+            timestep_list[timestep_list.len() - 2],
+            timestep_list[timestep_list.len() - 3],
+        );
         let (m0, m1, m2) = (
             model_output_list[model_output_list.len() - 1].as_ref(),
             model_output_list[model_output_list.len() - 2].as_ref(),
-            model_output_list[model_output_list.len() - 3].as_ref()
+            model_output_list[model_output_list.len() - 3].as_ref(),
         );
-        let (lambda_t, lambda_s0, lambda_s1, lambda_s2) = (self.lambda_t[t], self.lambda_t[s0], self.lambda_t[s1], self.lambda_t[s2]);
+        let (lambda_t, lambda_s0, lambda_s1, lambda_s2) =
+            (self.lambda_t[t], self.lambda_t[s0], self.lambda_t[s1], self.lambda_t[s2]);
         let (alpha_t, alpha_s0) = (self.alpha_t[t], self.alpha_t[s0]);
         let (sigma_t, sigma_s0) = (self.sigma_t[t], self.sigma_t[s0]);
         let (h, h_0, h_1) = (lambda_t - lambda_s0, lambda_s0 - lambda_s1, lambda_s1 - lambda_s2);
@@ -296,11 +309,14 @@ impl DPMSolverMultistepScheduler {
             .position(|&t| t == timestep)
             .unwrap();
 
-        let prev_timestep = if step_index == self.timesteps.len() - 1 { 0 } else { self.timesteps[step_index + 1] };
+        let prev_timestep =
+            if step_index == self.timesteps.len() - 1 { 0 } else { self.timesteps[step_index + 1] };
         let lower_order_final = (step_index == self.timesteps.len() - 1)
-            && self.config.lower_order_final && self.timesteps.len() < 15;
+            && self.config.lower_order_final
+            && self.timesteps.len() < 15;
         let lower_order_second = (step_index == self.timesteps.len() - 2)
-            && self.config.lower_order_final && self.timesteps.len() < 15;
+            && self.config.lower_order_final
+            && self.timesteps.len() < 15;
 
         let model_output = self.convert_model_output(model_output, timestep, sample);
         for i in 0..self.config.solver_order - 1 {
@@ -310,19 +326,27 @@ impl DPMSolverMultistepScheduler {
         let m = self.model_outputs.len();
         self.model_outputs[m - 1] = model_output.shallow_clone();
 
-        let prev_sample = if self.config.solver_order == 1 || self.lower_order_nums < 1 || lower_order_final {
-            self.dpm_solver_first_order_update(
-                model_output, timestep, prev_timestep, sample
-            )
+        let prev_sample = if self.config.solver_order == 1
+            || self.lower_order_nums < 1
+            || lower_order_final
+        {
+            self.dpm_solver_first_order_update(model_output, timestep, prev_timestep, sample)
         } else if self.config.solver_order == 2 || self.lower_order_nums < 2 || lower_order_second {
             let timestep_list = [self.timesteps[step_index - 1], timestep];
             self.multistep_dpm_solver_second_order_update(
-                &self.model_outputs, timestep_list, prev_timestep, sample
+                &self.model_outputs,
+                timestep_list,
+                prev_timestep,
+                sample,
             )
         } else {
-            let timestep_list = [self.timesteps[step_index - 2], self.timesteps[step_index - 1], timestep];
+            let timestep_list =
+                [self.timesteps[step_index - 2], self.timesteps[step_index - 1], timestep];
             self.multistep_dpm_solver_third_order_update(
-                &self.model_outputs, timestep_list, prev_timestep, sample
+                &self.model_outputs,
+                timestep_list,
+                prev_timestep,
+                sample,
             )
         };
 
