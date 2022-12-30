@@ -172,7 +172,7 @@ impl DPMSolverMultistepScheduler {
                     let sigma_t = self.sigma_t[timestep];
                     alpha_t * model_output + sigma_t * sample
                 }
-            }
+            },
         }
     }
 
@@ -242,13 +242,13 @@ impl DPMSolverMultistepScheduler {
                     (alpha_t / alpha_s0) * sample
                         - (sigma_t * (h.exp() - 1.0)) * d0
                         - 0.5 * (sigma_t * (h.exp() - 1.0)) * d1
-                },
+                }
                 DPMSolverType::Heun => {
                     (alpha_t / alpha_s0) * sample
                         - (sigma_t * (h.exp() - 1.0)) * d0
                         - (sigma_t * ((h.exp() - 1.0) / h - 1.0)) * d1
                 }
-            }
+            },
         }
     }
 
@@ -285,8 +285,7 @@ impl DPMSolverMultistepScheduler {
         match self.config.algorithm_type {
             DPMSolverAlgorithmType::DPMSolverPlusPlus => {
                 // See https://arxiv.org/abs/2206.00927 for detailed derivations
-                (sigma_t / sigma_s0) * sample
-                    - (alpha_t * ((-h).exp() - 1.0)) * d0
+                (sigma_t / sigma_s0) * sample - (alpha_t * ((-h).exp() - 1.0)) * d0
                     + (alpha_t * (((-h).exp() - 1.0) / h + 1.0)) * d1
                     - (alpha_t * (((-h).exp() - 1.0 + h) / h.powi(2) - 0.5)) * d2
             }
@@ -304,6 +303,7 @@ impl DPMSolverMultistepScheduler {
     }
 
     pub fn step(&mut self, model_output: &Tensor, timestep: usize, sample: &Tensor) -> Tensor {
+        #[rustfmt::skip]
         let step_index = self.timesteps
             .iter()
             .position(|&t| t == timestep)
