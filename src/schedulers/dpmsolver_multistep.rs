@@ -12,6 +12,9 @@ pub enum DPMSolverAlgorithmType {
     DPMSolver,
 }
 
+/// The solver type for the second-order solver.
+/// The solver type slightly affects the sample quality, especially for
+/// small number of steps.
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub enum DPMSolverType {
     #[default]
@@ -101,7 +104,7 @@ impl DPMSolverMultistepScheduler {
         let lambda_t = alpha_t.log() - sigma_t.log();
 
         let step = (config.train_timesteps - 1) as f64 / inference_steps as f64;
-        // np.linspace(0, train_steps - 1, inference_steps + 1).round()[::-1][:-1]
+        // https://github.com/huggingface/diffusers/blob/e4fe9413121b78c4c1f109b50f0f3cc1c320a1a2/src/diffusers/schedulers/scheduling_dpmsolver_multistep.py#L199-L204
         let timesteps: Vec<usize> = (0..inference_steps + 1)
             .map(|i| (i as f64 * step).round() as usize)
             // discards the 0.0 element
@@ -109,7 +112,6 @@ impl DPMSolverMultistepScheduler {
             .rev()
             .collect();
 
-        // tch::Tensor doesn't implement `Copy`
         let mut model_outputs = Vec::<Tensor>::new();
         for _ in 0..config.solver_order {
             model_outputs.push(Tensor::new());
@@ -303,11 +305,8 @@ impl DPMSolverMultistepScheduler {
     }
 
     pub fn step(&mut self, model_output: &Tensor, timestep: usize, sample: &Tensor) -> Tensor {
-        #[rustfmt::skip]
-        let step_index = self.timesteps
-            .iter()
-            .position(|&t| t == timestep)
-            .unwrap();
+        // https://github.com/huggingface/diffusers/blob/e4fe9413121b78c4c1f109b50f0f3cc1c320a1a2/src/diffusers/schedulers/scheduling_dpmsolver_multistep.py#L457
+        let step_index = self.timesteps.iter().position(|&t| t == timestep).unwrap();
 
         let prev_timestep =
             if step_index == self.timesteps.len() - 1 { 0 } else { self.timesteps[step_index + 1] };
