@@ -28,7 +28,9 @@ pub struct DDPMSchedulerConfig {
     pub clip_sample: bool,
     /// Option to clip the variance used when adding noise to the denoised sample.
     pub variance_type: DDPMVarianceType,
+    /// prediction type of the scheduler function
     pub prediction_type: PredictionType,
+    /// number of diffusion steps used to train the model.
     pub train_timesteps: usize,
 }
 
