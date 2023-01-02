@@ -200,16 +200,26 @@ fn run(args: Args) -> anyhow::Result<()> {
         }
     };
     let cuda_device = Device::cuda_if_available();
-    let cpu_or_cuda = |name: &str| {
-        if cpu.iter().any(|c| c == "all" || c == name) {
-            Device::Cpu
-        } else {
-            cuda_device
+    let get_device = |name: &str| match &cuda_device {
+        Device::Cpu => Device::Cpu,
+        Device::Cuda(_) => {
+            if cpu.iter().any(|c| c == "all" || c == name) {
+                Device::Cpu
+            } else {
+                cuda_device.clone()
+            }
+        }
+        Device::Mps => {
+            if cpu.iter().any(|c| c == "all" || c == name) {
+                Device::Cpu
+            } else {
+                Device::Mps
+            }
         }
     };
-    let clip_device = cpu_or_cuda("clip");
-    let vae_device = cpu_or_cuda("vae");
-    let unet_device = cpu_or_cuda("unet");
+    let clip_device = get_device("clip");
+    let vae_device = get_device("vae");
+    let unet_device = get_device("unet");
     let scheduler = sd_config.build_scheduler(n_steps);
 
     let tokenizer = clip::Tokenizer::create(vocab_file, &sd_config.clip)?;
