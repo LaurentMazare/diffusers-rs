@@ -9,6 +9,7 @@ pub mod ddim;
 pub mod ddpm;
 pub mod dpmsolver_multistep;
 pub mod euler_discrete;
+pub mod dpmsolver_singlestep;
 
 /// This represents how beta ranges from its minimum value to the maximum
 /// during training.
