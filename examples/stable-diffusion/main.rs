@@ -132,6 +132,10 @@ struct Args {
 
     #[arg(long, value_enum, default_value = "v2-1")]
     sd_version: StableDiffusionVersion,
+
+    /// Generate intermediary images at each step.
+    #[arg(long, action)]
+    intermediary_images: bool,
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
@@ -169,6 +173,33 @@ impl Args {
                 StableDiffusionVersion::V2_1 => "data/unet_v2.1.ot".to_string(),
             },
         }
+    }
+}
+
+fn output_filename(
+    basename: &str,
+    sample_idx: i64,
+    num_samples: i64,
+    timestep_idx: Option<usize>,
+) -> String {
+    let filename = if num_samples > 1 {
+        match basename.rsplit_once('.') {
+            None => format!("{}.{}.png", basename, sample_idx),
+            Some((filename_no_extension, extension)) => {
+                format!("{}.{}.{}", filename_no_extension, sample_idx, extension)
+            }
+        }
+    } else {
+        basename.to_string()
+    };
+    match timestep_idx {
+        None => filename,
+        Some(timestep_idx) => match filename.rsplit_once('.') {
+            None => format!("{}-{}.png", filename, timestep_idx),
+            Some((filename_no_extension, extension)) => {
+                format!("{}-{}.{}", filename_no_extension, timestep_idx, extension)
+            }
+        },
     }
 }
 
@@ -251,6 +282,16 @@ fn run(args: Args) -> anyhow::Result<()> {
             let noise_pred =
                 noise_pred_uncond + (noise_pred_text - noise_pred_uncond) * GUIDANCE_SCALE;
             latents = scheduler.step(&noise_pred, timestep, &latents);
+
+            if args.intermediary_images {
+                let latents = latents.to(vae_device);
+                let image = vae.decode(&(&latents / 0.18215));
+                let image = (image / 2 + 0.5).clamp(0., 1.).to_device(Device::Cpu);
+                let image = (image * 255.).to_kind(Kind::Uint8);
+                let final_image =
+                    output_filename(&final_image, idx + 1, num_samples, Some(timestep_index + 1));
+                tch::vision::image::save(&image, final_image)?;
+            }
         }
 
         println!("Generating the final image for sample {}/{}.", idx + 1, num_samples);
@@ -258,16 +299,7 @@ fn run(args: Args) -> anyhow::Result<()> {
         let image = vae.decode(&(&latents / 0.18215));
         let image = (image / 2 + 0.5).clamp(0., 1.).to_device(Device::Cpu);
         let image = (image * 255.).to_kind(Kind::Uint8);
-        let final_image = if num_samples > 1 {
-            match final_image.rsplit_once('.') {
-                None => format!("{}.{}.png", final_image, idx + 1),
-                Some((filename_no_extension, extension)) => {
-                    format!("{}.{}.{}", filename_no_extension, idx + 1, extension)
-                }
-            }
-        } else {
-            final_image.clone()
-        };
+        let final_image = output_filename(&final_image, idx + 1, num_samples, None);
         tch::vision::image::save(&image, final_image)?;
     }
 
