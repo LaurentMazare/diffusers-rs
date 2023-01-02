@@ -69,7 +69,7 @@
 //   cargo run --release --example tensor-tools cp ./data/vae.npz ./data/vae.ot
 //   cargo run --release --example tensor-tools cp ./data/unet.npz ./data/unet.ot
 use clap::Parser;
-use diffusers::pipelines::stable_diffusion;
+use diffusers::{pipelines::stable_diffusion, schedulers};
 use diffusers::transformers::clip;
 use tch::{nn::Module, Device, Kind, Tensor};
 
@@ -241,7 +241,6 @@ fn run(args: Args) -> anyhow::Result<()> {
     let clip_device = cpu_or_cuda("clip");
     let vae_device = cpu_or_cuda("vae");
     let unet_device = cpu_or_cuda("unet");
-    let scheduler = sd_config.build_scheduler(n_steps);
 
     let tokenizer = clip::Tokenizer::create(vocab_file, &sd_config.clip)?;
     println!("Running with prompt \"{prompt}\".");
@@ -275,6 +274,11 @@ fn run(args: Args) -> anyhow::Result<()> {
 
         // scale the initial noise by the standard deviation required by the scheduler
         latents *= scheduler.init_noise_sigma();
+
+        let scheduler = sd_config.build_scheduler(n_steps);
+        // let mut scheduler = schedulers::dpmsolver_singlestep::DPMSolverSinglestepScheduler::new(n_steps, Default::default());
+        // Using this scheduler requires mutability, so change the to the following 
+        // for (timestep_index, &timestep) in scheduler.timesteps().to_owned().iter().enumerate() {
 
         for (timestep_index, &timestep) in scheduler.timesteps().iter().enumerate() {
             println!("Timestep {timestep_index}/{n_steps}");
