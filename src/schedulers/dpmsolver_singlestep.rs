@@ -1,3 +1,5 @@
+use std::iter::repeat;
+
 use super::{betas_for_alpha_bar, BetaSchedule, PredictionType};
 use tch::{kind, Kind, Tensor};
 
@@ -52,9 +54,9 @@ pub struct DPMSolverSinglestepSchedulerConfig {
 impl Default for DPMSolverSinglestepSchedulerConfig {
     fn default() -> Self {
         Self {
-            train_timesteps: 1000,
             beta_start: 0.0001,
             beta_end: 0.02,
+            train_timesteps: 1000,
             beta_schedule: BetaSchedule::Linear,
             solver_order: 2,
             prediction_type: PredictionType::Epsilon,
@@ -72,9 +74,10 @@ pub struct DPMSolverSinglestepScheduler {
     sigma_t: Vec<f64>,
     lambda_t: Vec<f64>,
     init_noise_sigma: f64,
-    lower_order_nums: usize,
+    order_list: Vec<usize>,
     model_outputs: Vec<Tensor>,
     timesteps: Vec<usize>,
+    sample: Option<Tensor>,
     pub config: DPMSolverSinglestepSchedulerConfig,
 }
 
@@ -123,10 +126,11 @@ impl DPMSolverSinglestepScheduler {
             sigma_t: Vec::<f64>::from(sigma_t),
             lambda_t: Vec::<f64>::from(lambda_t),
             init_noise_sigma: 1.,
-            lower_order_nums: 0,
+            order_list: get_order_list(inference_steps, config.solver_order, false),
             model_outputs,
             timesteps,
             config,
+            sample: None,
         }
     }
 
@@ -182,7 +186,7 @@ impl DPMSolverSinglestepScheduler {
     ///  See https://arxiv.org/abs/2206.00927 for the detailed derivation.
     fn dpm_solver_first_order_update(
         &self,
-        model_output: Tensor,
+        model_output: &Tensor,
         timestep: usize,
         prev_timestep: usize,
         sample: &Tensor,
@@ -319,51 +323,52 @@ impl DPMSolverSinglestepScheduler {
 
     pub fn step(&mut self, model_output: &Tensor, timestep: usize, sample: &Tensor) -> Tensor {
         // https://github.com/huggingface/diffusers/blob/e4fe9413121b78c4c1f109b50f0f3cc1c320a1a2/src/diffusers/schedulers/scheduling_dpmsolver_multistep.py#L457
-        let step_index = self.timesteps.iter().position(|&t| t == timestep).unwrap();
+        let step_index: usize = self.timesteps.iter().position(|&t| t == timestep).unwrap();
 
         let prev_timestep =
             if step_index == self.timesteps.len() - 1 { 0 } else { self.timesteps[step_index + 1] };
-        let lower_order_final = (step_index == self.timesteps.len() - 1)
-            && self.config.lower_order_final
-            && self.timesteps.len() < 15;
-        let lower_order_second = (step_index == self.timesteps.len() - 2)
-            && self.config.lower_order_final
-            && self.timesteps.len() < 15;
 
-        let model_output = self.convert_model_output(model_output, timestep, sample);
+        let model_output = self.convert_model_output(model_output, timestep, &sample);
         for i in 0..self.config.solver_order - 1 {
             self.model_outputs[i] = self.model_outputs[i + 1].shallow_clone();
         }
         let m = self.model_outputs.len();
-        self.model_outputs[m - 1] = model_output.shallow_clone();
+        self.model_outputs[m - 1] = model_output;
 
-        let prev_sample = if self.config.solver_order == 1
-            || self.lower_order_nums < 1
-            || lower_order_final
-        {
-            self.dpm_solver_first_order_update(model_output, timestep, prev_timestep, sample)
-        } else if self.config.solver_order == 2 || self.lower_order_nums < 2 || lower_order_second {
-            let timestep_list = [self.timesteps[step_index - 1], timestep];
-            self.singlestep_dpm_solver_second_order_update(
-                &self.model_outputs,
-                timestep_list,
-                prev_timestep,
-                sample,
-            )
-        } else {
-            let timestep_list =
-                [self.timesteps[step_index - 2], self.timesteps[step_index - 1], timestep];
-            self.singlestep_dpm_solver_third_order_update(
-                &self.model_outputs,
-                timestep_list,
-                prev_timestep,
-                sample,
-            )
+        let order = self.order_list[step_index];
+
+        // For single-step solvers, we use the initial value at each time with order = 1.
+        if order == 1 {
+            self.sample = Some(sample.shallow_clone());
         };
 
-        if self.lower_order_nums < self.config.solver_order {
-            self.lower_order_nums += 1;
-        }
+        let prev_sample = match order {
+            1 => self.dpm_solver_first_order_update(
+                &self.model_outputs[self.model_outputs.len() - 1],
+                timestep,
+                prev_timestep,
+                &self.sample.as_ref().unwrap(),
+            ),
+            2 => self.singlestep_dpm_solver_second_order_update(
+                &self.model_outputs,
+                [self.timesteps[step_index - 1], self.timesteps[step_index]],
+                prev_timestep,
+                self.sample.as_ref().unwrap(),
+            ),
+            3 => self.singlestep_dpm_solver_third_order_update(
+                &self.model_outputs,
+                [
+                    self.timesteps[step_index - 2],
+                    self.timesteps[step_index - 1],
+                    self.timesteps[step_index],
+                ],
+                prev_timestep,
+                self.sample.as_ref().unwrap(),
+            ),
+            _ => {
+                panic!("invalid order");
+            }
+        };
 
         prev_sample
     }
@@ -375,5 +380,117 @@ impl DPMSolverSinglestepScheduler {
 
     pub fn init_noise_sigma(&self) -> f64 {
         self.init_noise_sigma
+    }
+}
+
+/// Computes the solver order at each time step.
+/// solver_order 1 2 3 
+fn get_order_list<'a>(steps: usize, solver_order: usize, lower_order_final: bool) -> Vec<usize> {
+    if lower_order_final {
+        if solver_order == 3 {
+            if steps % 3 == 0 {
+                repeat(&[1, 2, 3][..])
+                    .take((steps / 3) - 1)
+                    .chain([&[1, 2][..], &[1][..]])
+                    .flatten()
+                    .map(|v| *v)
+                    .collect()
+            } else if steps % 3 == 1 {
+                repeat(&[1, 2, 3][..])
+                    .take(steps / 3)
+                    .chain([&[1][..]])
+                    .flatten()
+                    .map(|v| *v)
+                    .collect()
+            } else {
+                repeat(&[1, 2, 3][..])
+                    .take(steps / 3)
+                    .chain([&[1][..], &[2][..]])
+                    .flatten()
+                    .map(|v| *v)
+                    .collect()
+            }
+        } else if solver_order == 2 {
+            if steps % 2 == 0 {
+                repeat(&[1, 2][..]).take(steps / 2).flatten().map(|v| *v).collect()
+            } else {
+                repeat(&[1, 2][..])
+                    .take(steps / 2)
+                    .chain([&[1][..]])
+                    .flatten()
+                    .map(|v| *v)
+                    .collect()
+            }
+        } else if solver_order == 1 {
+            repeat(&[1][..]).take(steps).flatten().map(|v| *v).collect()
+        } else {
+            panic!("invalid solver_order");
+        }
+    } else {
+        if solver_order == 3 {
+            repeat(&[1, 2, 3][..]).take(steps / 3).flatten().map(|v| *v).collect()
+        } else if solver_order == 2 {
+            repeat(&[1, 2][..]).take(steps / 2).flatten().map(|v| *v).collect()
+        } else if solver_order == 1 {
+            repeat(&[1][..]).take(steps).flatten().map(|v| *v).collect()
+        } else {
+            panic!("invalid solver_order");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::get_order_list;
+
+    #[test]
+    fn order_list() {
+        let list = get_order_list(15, 2, false);
+
+        assert_eq!(15, list.len());
+        assert_eq!(vec![1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2], list);
+
+        let list = get_order_list(16, 2, false);
+
+        assert_eq!(16, list.len());
+        assert_eq!(vec![1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2], list);
+
+        let list = get_order_list(16, 1, false);
+
+        assert_eq!(16, list.len());
+        assert_eq!(vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], list);
+
+        let list = get_order_list(16, 3, false);
+
+        assert_eq!(16, list.len());
+        assert_eq!(vec![1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3], list);
+
+        let list = get_order_list(16, 3, true);
+
+        assert_eq!(16, list.len());
+        assert_eq!(vec![1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1], list);
+
+        let list = get_order_list(16, 1, true);
+
+        assert_eq!(16, list.len());
+        assert_eq!(vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], list);
+
+        let list = get_order_list(25, 1, true);
+
+        assert_eq!(25, list.len());
+        assert_eq!(
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            list
+        );
+
+        let list = get_order_list(1, 1, true);
+
+        assert_eq!(1, list.len());
+        assert_eq!(vec![1], list);
+
+        let list = get_order_list(2, 2, true);
+
+        assert_eq!(2, list.len());
+        assert_eq!(vec![1, 2], list);
     }
 }

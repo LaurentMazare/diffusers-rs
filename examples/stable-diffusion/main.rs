@@ -69,8 +69,8 @@
 //   cargo run --release --example tensor-tools cp ./data/vae.npz ./data/vae.ot
 //   cargo run --release --example tensor-tools cp ./data/unet.npz ./data/unet.ot
 use clap::Parser;
-use diffusers::{pipelines::stable_diffusion, schedulers};
 use diffusers::transformers::clip;
+use diffusers::{pipelines::stable_diffusion, schedulers};
 use tch::{nn::Module, Device, Kind, Tensor};
 
 const GUIDANCE_SCALE: f64 = 7.5;
@@ -278,7 +278,7 @@ fn run(args: Args) -> anyhow::Result<()> {
         let scheduler = sd_config.build_scheduler(n_steps);
         // let mut scheduler = schedulers::dpmsolver_singlestep::DPMSolverSinglestepScheduler::new(n_steps, Default::default());
         // Using this scheduler requires mutability, so change the to the following 
-        // for (timestep_index, &timestep) in scheduler.timesteps().to_owned().iter().enumerate() {
+        // scheduler.timesteps().to_owned().iter().enumerate() 
 
         for (timestep_index, &timestep) in scheduler.timesteps().iter().enumerate() {
             println!("Timestep {timestep_index}/{n_steps}");
