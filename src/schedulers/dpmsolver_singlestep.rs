@@ -142,6 +142,12 @@ impl DPMSolverSinglestepScheduler {
     ///
     /// Note that the algorithm type and the model type is decoupled. That is to say, we can use either DPM-Solver or
     /// DPM-Solver++ for both noise prediction model and data prediction model.
+    ///
+    /// # Arguments
+    ///
+    /// * `model_output` - direct output from learned diffusion mode
+    /// * `timestep` - current discrete timestep in the diffusion chain
+    /// * `sample` - current instance of sample being created by diffusion process
     fn convert_model_output(
         &self,
         model_output: &Tensor,
@@ -182,8 +188,15 @@ impl DPMSolverSinglestepScheduler {
         }
     }
 
-    ///  One step for the first-order DPM-Solver (equivalent to DDIM).
-    ///  See https://arxiv.org/abs/2206.00927 for the detailed derivation.
+    /// One step for the first-order DPM-Solver (equivalent to DDIM).
+    /// See https://arxiv.org/abs/2206.00927 for the detailed derivation.
+    ///
+    /// # Arguments
+    ///
+    /// * `model_output` - direct output from learned diffusion model
+    /// * `timestep` - current discrete timestep in the diffusion chain
+    /// * `prev_timestep` - previous discrete timestep in the diffusion chain
+    /// * `sample` - current instance of sample being created by diffusion process
     fn dpm_solver_first_order_update(
         &self,
         model_output: &Tensor,
@@ -205,7 +218,15 @@ impl DPMSolverSinglestepScheduler {
         }
     }
 
-    ///  One step for the second-order multistep DPM-Solver.
+    /// One step for the second-order multistep DPM-Solver.
+    /// It computes the solution at time `prev_timestep` from the time `timestep_list[-2]`.
+    ///
+    /// # Arguments
+    ///
+    /// * `model_output_list` - direct outputs from learned diffusion model at current and latter timesteps
+    /// * `timestep_list` - current and latter discrete timestep in the diffusion chain
+    /// * `prev_timestep` - previous discrete timestep in the diffusion chain
+    /// * `sample` - current instance of sample being created by diffusion process
     fn singlestep_dpm_solver_second_order_update(
         &self,
         model_output_list: &Vec<Tensor>,
@@ -259,6 +280,14 @@ impl DPMSolverSinglestepScheduler {
     }
 
     /// One step for the third-order multistep DPM-Solver
+    /// It computes the solution at time `prev_timestep` from the time `timestep_list[-3]`.
+    ///
+    /// # Arguments
+    ///
+    /// * `model_output_list` - direct outputs from learned diffusion model at current and latter timesteps
+    /// * `timestep_list` - current and latter discrete timestep in the diffusion chain
+    /// * `prev_timestep` - previous discrete timestep in the diffusion chain
+    /// * `sample` - current instance of sample being created by diffusion process
     fn singlestep_dpm_solver_third_order_update(
         &self,
         model_output_list: &Vec<Tensor>,
@@ -321,8 +350,15 @@ impl DPMSolverSinglestepScheduler {
         self.timesteps.as_slice()
     }
 
+    /// Step function propagating the sample with the singlestep DPM-Solver
+    ///
+    /// # Arguments
+    ///
+    /// * `model_output` - direct output from learned diffusion model
+    /// * `timestep` - current discrete timestep in the diffusion chain
+    /// * `sample` - current instance of sample being created by diffusion process
     pub fn step(&mut self, model_output: &Tensor, timestep: usize, sample: &Tensor) -> Tensor {
-        // https://github.com/huggingface/diffusers/blob/e4fe9413121b78c4c1f109b50f0f3cc1c320a1a2/src/diffusers/schedulers/scheduling_dpmsolver_multistep.py#L457
+        // https://github.com/huggingface/diffusers/blob/e4fe9413121b78c4c1f109b50f0f3cc1c320a1a2/src/diffusers/schedulers/scheduling_dpmsolver_singlestep.py#L535
         let step_index: usize = self.timesteps.iter().position(|&t| t == timestep).unwrap();
 
         let prev_timestep =
@@ -384,8 +420,15 @@ impl DPMSolverSinglestepScheduler {
 }
 
 /// Computes the solver order at each time step.
-/// solver_order 1 2 3 
-fn get_order_list<'a>(steps: usize, solver_order: usize, lower_order_final: bool) -> Vec<usize> {
+///
+/// # Arguments
+///
+/// * `steps` - the number of diffusion steps used when generating samples with a pre-trained model
+/// * `solver_order` - the order of DPM-Solver; can be `1` or `2` or `3`. We recommend to use `solver_order=2` for guided
+///     sampling, and `solver_order=3` for unconditional sampling.
+/// * `lower_order_final` - whether to use lower-order solvers in the final steps. For singlestep schedulers, we recommend to enable
+///     this to use up all the function evaluations.
+fn get_order_list(steps: usize, solver_order: usize, lower_order_final: bool) -> Vec<usize> {
     if lower_order_final {
         if solver_order == 3 {
             if steps % 3 == 0 {
