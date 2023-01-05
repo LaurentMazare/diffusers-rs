@@ -47,6 +47,7 @@ pub struct DDIMScheduler {
     timesteps: Vec<usize>,
     alphas_cumprod: Vec<f64>,
     step_ratio: usize,
+    init_noise_sigma: f64,
     pub config: DDIMSchedulerConfig,
 }
 
@@ -77,11 +78,17 @@ impl DDIMScheduler {
         };
         let alphas: Tensor = 1.0 - betas;
         let alphas_cumprod = Vec::<f64>::from(alphas.cumprod(0, Kind::Double));
-        Self { alphas_cumprod, timesteps, step_ratio, config }
+        Self { alphas_cumprod, timesteps, step_ratio, init_noise_sigma: 1., config }
     }
 
     pub fn timesteps(&self) -> &[usize] {
         self.timesteps.as_slice()
+    }
+
+    ///  Ensures interchangeability with schedulers that need to scale the denoising model input
+    /// depending on the current timestep.
+    pub fn scale_model_input(&self, sample: Tensor, _timestep: usize) -> Tensor {
+        sample
     }
 
     /// Performs a backward step during inference.
@@ -132,5 +139,9 @@ impl DDIMScheduler {
         let sqrt_alpha_prod = self.alphas_cumprod[timestep].sqrt();
         let sqrt_one_minus_alpha_prod = (1.0 - self.alphas_cumprod[timestep]).sqrt();
         sqrt_alpha_prod * original + sqrt_one_minus_alpha_prod * noise
+    }
+
+    pub fn init_noise_sigma(&self) -> f64 {
+        self.init_noise_sigma
     }
 }
