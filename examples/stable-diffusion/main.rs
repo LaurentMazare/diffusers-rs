@@ -271,7 +271,10 @@ fn run(args: Args) -> anyhow::Result<()> {
         let mut latents = Tensor::randn(
             &[bsize, 4, sd_config.height / 8, sd_config.width / 8],
             (Kind::Float, unet_device),
-        ) * scheduler.init_noise_sigma();
+        );
+
+        // scale the initial noise by the standard deviation required by the scheduler
+        latents *= scheduler.init_noise_sigma();
 
         for (timestep_index, &timestep) in scheduler.timesteps().iter().enumerate() {
             println!("Timestep {timestep_index}/{n_steps}");
