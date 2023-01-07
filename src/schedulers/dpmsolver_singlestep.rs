@@ -404,6 +404,8 @@ fn get_order_list(steps: usize, solver_order: usize, lower_order_final: bool) ->
                     .chain([&[1][..]])
                     .flatten()
                     .map(|v| *v)
+                    .collect()
+            }
         } else if solver_order == 1 {
             repeat(&[1][..]).take(steps).flatten().map(|v| *v).collect()
         } else {
@@ -416,6 +418,8 @@ fn get_order_list(steps: usize, solver_order: usize, lower_order_final: bool) ->
             repeat(dbg!(&[1, 2][..])).take(dbg!(steps / 2)).flatten().map(|v| dbg!(*v)).collect()
         } else if solver_order == 1 {
             repeat(&[1][..]).take(steps).flatten().map(|v| *v).collect()
+        } else {
+            panic!("invalid solver_order");
         }
     }
 }
