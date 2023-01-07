@@ -3,11 +3,12 @@
 //! Noise schedulers can be used to set the trade-off between
 //! inference speed and quality.
 
-use tch::Tensor;
+use tch::{Kind, Tensor};
 
 pub mod ddim;
 pub mod ddpm;
 pub mod dpmsolver_multistep;
+pub mod euler_discrete;
 
 /// This represents how beta ranges from its minimum value to the maximum
 /// during training.
@@ -45,4 +46,25 @@ pub(crate) fn betas_for_alpha_bar(num_diffusion_timesteps: usize, max_beta: f64)
     }
 
     Tensor::of_slice(&betas)
+}
+
+/// One-dimensional linear interpolation for monotonically increasing sample
+/// points, mimicking np.interp().
+///
+/// Based on https://github.com/pytorch/pytorch/issues/50334#issuecomment-1000917964
+pub fn interp(x: &[f64], xp: Tensor, yp: Tensor) -> Tensor {
+    // (yp[1:] - yp[:-1]) / (xp[1:] - xp[:-1])
+    let m = (yp.slice(0, 1, None, 1) - yp.slice(0, 0, -1, 1))
+        / (xp.slice(0, 1, None, 1) - xp.slice(0, 0, -1, 1));
+
+    // yp[:-1] - (m * xp[:-1])
+    let b = yp.slice(0, 0, -1, 1) - (&m * xp.slice(0, 0, -1, 1));
+
+    let mut tensors = vec![];
+    for &t in x.iter() {
+        tensors.push(xp.le(t).sum(Kind::Int64) - 1);
+    }
+    let indices = Tensor::stack(&tensors, 0).clamp(0, m.size1().unwrap() - 1);
+
+    m.take(&indices) * Tensor::of_slice(x) + b.take(&indices)
 }
