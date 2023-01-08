@@ -2,7 +2,9 @@ use std::iter::repeat;
 
 use super::{
     betas_for_alpha_bar,
-    dpmsolver::{DPMSolverAlgorithmType, DPMSolverSchedulerConfig, DPMSolverType},
+    dpmsolver::{
+        DPMSolverAlgorithmType, DPMSolverScheduler, DPMSolverSchedulerConfig, DPMSolverType,
+    },
     BetaSchedule, PredictionType,
 };
 use tch::{kind, Kind, Tensor};
@@ -23,8 +25,8 @@ pub struct DPMSolverSinglestepScheduler {
     pub config: DPMSolverSchedulerConfig,
 }
 
-impl DPMSolverSinglestepScheduler {
-    pub fn new(inference_steps: usize, config: DPMSolverSchedulerConfig) -> Self {
+impl DPMSolverScheduler for DPMSolverSinglestepScheduler {
+    fn new(inference_steps: usize, config: DPMSolverSchedulerConfig) -> Self {
         let betas = match config.beta_schedule {
             BetaSchedule::ScaledLinear => Tensor::linspace(
                 config.beta_start.sqrt(),
@@ -141,9 +143,9 @@ impl DPMSolverSinglestepScheduler {
     /// * `timestep` - current discrete timestep in the diffusion chain
     /// * `prev_timestep` - previous discrete timestep in the diffusion chain
     /// * `sample` - current instance of sample being created by diffusion process
-    fn dpm_solver_first_order_update(
+    fn first_order_update(
         &self,
-        model_output: &Tensor,
+        model_output: Tensor,
         timestep: usize,
         prev_timestep: usize,
         sample: &Tensor,
@@ -171,7 +173,7 @@ impl DPMSolverSinglestepScheduler {
     /// * `timestep_list` - current and latter discrete timestep in the diffusion chain
     /// * `prev_timestep` - previous discrete timestep in the diffusion chain
     /// * `sample` - current instance of sample being created by diffusion process
-    fn singlestep_dpm_solver_second_order_update(
+    fn second_order_update(
         &self,
         model_output_list: &Vec<Tensor>,
         timestep_list: [usize; 2],
@@ -232,7 +234,7 @@ impl DPMSolverSinglestepScheduler {
     /// * `timestep_list` - current and latter discrete timestep in the diffusion chain
     /// * `prev_timestep` - previous discrete timestep in the diffusion chain
     /// * `sample` - current instance of sample being created by diffusion process
-    fn singlestep_dpm_solver_third_order_update(
+    fn third_order_update(
         &self,
         model_output_list: &Vec<Tensor>,
         timestep_list: [usize; 3],
@@ -290,13 +292,13 @@ impl DPMSolverSinglestepScheduler {
         }
     }
 
-    pub fn timesteps(&self) -> &[usize] {
+    fn timesteps(&self) -> &[usize] {
         self.timesteps.as_slice()
     }
 
     /// Ensures interchangeability with schedulers that need to scale the denoising model input
     /// depending on the current timestep.
-    pub fn scale_model_input(&self, sample: Tensor, _timestep: usize) -> Tensor {
+    fn scale_model_input(&self, sample: Tensor, _timestep: usize) -> Tensor {
         sample
     }
 
@@ -307,7 +309,7 @@ impl DPMSolverSinglestepScheduler {
     /// * `model_output` - direct output from learned diffusion model
     /// * `timestep` - current discrete timestep in the diffusion chain
     /// * `sample` - current instance of sample being created by diffusion process
-    pub fn step(&mut self, model_output: &Tensor, timestep: usize, sample: &Tensor) -> Tensor {
+    fn step(&mut self, model_output: &Tensor, timestep: usize, sample: &Tensor) -> Tensor {
         // https://github.com/huggingface/diffusers/blob/e4fe9413121b78c4c1f109b50f0f3cc1c320a1a2/src/diffusers/schedulers/scheduling_dpmsolver_singlestep.py#L535
         let step_index: usize = self.timesteps.iter().position(|&t| t == timestep).unwrap();
 
@@ -329,19 +331,19 @@ impl DPMSolverSinglestepScheduler {
         };
 
         match order {
-            1 => self.dpm_solver_first_order_update(
-                &self.model_outputs[self.model_outputs.len() - 1],
+            1 => self.first_order_update(
+                model_output,
                 timestep,
                 prev_timestep,
                 &self.sample.as_ref().unwrap(),
             ),
-            2 => self.singlestep_dpm_solver_second_order_update(
+            2 => self.second_order_update(
                 &self.model_outputs,
                 [self.timesteps[step_index - 1], self.timesteps[step_index]],
                 prev_timestep,
                 &self.sample.as_ref().unwrap(),
             ),
-            3 => self.singlestep_dpm_solver_third_order_update(
+            3 => self.third_order_update(
                 &self.model_outputs,
                 [
                     self.timesteps[step_index - 2],
@@ -357,12 +359,12 @@ impl DPMSolverSinglestepScheduler {
         }
     }
 
-    pub fn add_noise(&self, original_samples: &Tensor, noise: Tensor, timestep: usize) -> Tensor {
+    fn add_noise(&self, original_samples: &Tensor, noise: Tensor, timestep: usize) -> Tensor {
         self.alphas_cumprod[timestep].sqrt() * original_samples.to_owned()
             + (1.0 - self.alphas_cumprod[timestep]).sqrt() * noise
     }
 
-    pub fn init_noise_sigma(&self) -> f64 {
+    fn init_noise_sigma(&self) -> f64 {
         self.init_noise_sigma
     }
 }
