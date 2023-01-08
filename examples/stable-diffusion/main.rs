@@ -70,7 +70,7 @@
 //   cargo run --release --example tensor-tools cp ./data/unet.npz ./data/unet.ot
 use clap::Parser;
 use diffusers::transformers::clip;
-use diffusers::{pipelines::stable_diffusion, schedulers};
+use diffusers::pipelines::stable_diffusion;
 use tch::{nn::Module, Device, Kind, Tensor};
 
 const GUIDANCE_SCALE: f64 = 7.5;
