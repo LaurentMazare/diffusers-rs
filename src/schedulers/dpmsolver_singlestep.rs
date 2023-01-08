@@ -49,7 +49,7 @@ impl DPMSolverSinglestepScheduler {
         let lambda_t = alpha_t.log() - sigma_t.log();
 
         let step = (config.train_timesteps - 1) as f64 / inference_steps as f64;
-        // https://github.com/huggingface/diffusers/blob/e4fe9413121b78c4c1f109b50f0f3cc1c320a1a2/src/diffusers/schedulers/scheduling_dpmsolver_multistep.py#L199-L204
+        // https://github.com/huggingface/diffusers/blob/e4fe9413121b78c4c1f109b50f0f3cc1c320a1a2/src/diffusers/schedulers/scheduling_dpmsolver_singlestep.py#L172-L173
         let timesteps: Vec<usize> = (0..inference_steps + 1)
             .map(|i| (i as f64 * step).round() as usize)
             // discards the 0.0 element
@@ -62,13 +62,15 @@ impl DPMSolverSinglestepScheduler {
             model_outputs.push(Tensor::new());
         }
 
+        let order_list = get_order_list(inference_steps, config.solver_order, true);
+
         Self {
             alphas_cumprod: Vec::<f64>::from(alphas_cumprod),
             alpha_t: Vec::<f64>::from(alpha_t),
             sigma_t: Vec::<f64>::from(sigma_t),
             lambda_t: Vec::<f64>::from(lambda_t),
             init_noise_sigma: 1.,
-            order_list: get_order_list(inference_steps, config.solver_order, false),
+            order_list,
             model_outputs,
             timesteps,
             config,
@@ -292,6 +294,12 @@ impl DPMSolverSinglestepScheduler {
         self.timesteps.as_slice()
     }
 
+    /// Ensures interchangeability with schedulers that need to scale the denoising model input
+    /// depending on the current timestep.
+    pub fn scale_model_input(&self, sample: Tensor, _timestep: usize) -> Tensor {
+        sample
+    }
+
     /// Step function propagating the sample with the singlestep DPM-Solver
     ///
     /// # Arguments
@@ -311,7 +319,7 @@ impl DPMSolverSinglestepScheduler {
             self.model_outputs[i] = self.model_outputs[i + 1].shallow_clone();
         }
         let m = self.model_outputs.len();
-        self.model_outputs[m - 1] = model_output;
+        self.model_outputs[m - 1] = model_output.shallow_clone();
 
         let order = self.order_list[step_index];
 
@@ -320,7 +328,7 @@ impl DPMSolverSinglestepScheduler {
             self.sample = Some(sample.shallow_clone());
         };
 
-        let prev_sample = match order {
+        match order {
             1 => self.dpm_solver_first_order_update(
                 &self.model_outputs[self.model_outputs.len() - 1],
                 timestep,
@@ -331,7 +339,7 @@ impl DPMSolverSinglestepScheduler {
                 &self.model_outputs,
                 [self.timesteps[step_index - 1], self.timesteps[step_index]],
                 prev_timestep,
-                self.sample.as_ref().unwrap(),
+                &self.sample.as_ref().unwrap(),
             ),
             3 => self.singlestep_dpm_solver_third_order_update(
                 &self.model_outputs,
@@ -341,14 +349,12 @@ impl DPMSolverSinglestepScheduler {
                     self.timesteps[step_index],
                 ],
                 prev_timestep,
-                self.sample.as_ref().unwrap(),
+                &self.sample.as_ref().unwrap(),
             ),
             _ => {
                 panic!("invalid order");
             }
-        };
-
-        prev_sample
+        }
     }
 
     pub fn add_noise(&self, original_samples: &Tensor, noise: Tensor, timestep: usize) -> Tensor {

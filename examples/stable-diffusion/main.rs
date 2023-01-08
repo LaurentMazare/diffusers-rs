@@ -273,13 +273,6 @@ fn run(args: Args) -> anyhow::Result<()> {
         );
 
         let scheduler = sd_config.build_scheduler(n_steps);
-        // let mut scheduler = schedulers::dpmsolver_singlestep::DPMSolverSinglestepScheduler::new(
-        //     n_steps,
-        //     Default::default(),
-        // );
-        // Using this scheduler requires mutability, so change the to the following
-        // for (timestep_index, &timestep) in scheduler.timesteps().to_owned().iter().enumerate() {
-        
         for (timestep_index, &timestep) in scheduler.timesteps().iter().enumerate() {
             println!("Timestep {timestep_index}/{n_steps}");
             let latent_model_input = Tensor::cat(&[&latents, &latents], 0);
