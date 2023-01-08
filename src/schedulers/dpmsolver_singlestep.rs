@@ -415,7 +415,7 @@ fn get_order_list(steps: usize, solver_order: usize, lower_order_final: bool) ->
         if solver_order == 3 {
             repeat(&[1, 2, 3][..]).take(steps / 3).flatten().map(|v| *v).collect()
         } else if solver_order == 2 {
-            repeat(dbg!(&[1, 2][..])).take(dbg!(steps / 2)).flatten().map(|v| dbg!(*v)).collect()
+            repeat(&[1, 2][..]).take(steps / 2).flatten().map(|v| *v).collect()
         } else if solver_order == 1 {
             repeat(&[1][..]).take(steps).flatten().map(|v| *v).collect()
         } else {
@@ -430,52 +430,34 @@ mod tests {
 
     #[test]
     fn order_list() {
-        let list = get_order_list(15, 2, false);
+        assert_eq!(get_order_list(15, 2, false), vec![1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2],);
 
-        assert_eq!(15, list.len());
-        assert_eq!(vec![1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2], list);
-
-        let list = get_order_list(16, 2, false);
-
-        assert_eq!(16, list.len());
-        assert_eq!(vec![1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2], list);
-
-        let list = get_order_list(16, 1, false);
-
-        assert_eq!(16, list.len());
-        assert_eq!(vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], list);
-
-        let list = get_order_list(16, 3, false);
-
-        assert_eq!(16, list.len());
-        assert_eq!(vec![1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3], list);
-
-        let list = get_order_list(16, 3, true);
-
-        assert_eq!(16, list.len());
-        assert_eq!(vec![1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1], list);
-
-        let list = get_order_list(16, 1, true);
-
-        assert_eq!(16, list.len());
-        assert_eq!(vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], list);
-
-        let list = get_order_list(25, 1, true);
-
-        assert_eq!(25, list.len());
         assert_eq!(
-            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            list
+            get_order_list(16, 2, false),
+            vec![1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2]
         );
 
-        let list = get_order_list(1, 1, true);
+        assert_eq!(
+            get_order_list(16, 1, false),
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        );
 
-        assert_eq!(1, list.len());
-        assert_eq!(vec![1], list);
+        assert_eq!(get_order_list(16, 3, false), vec![1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]);
+        assert_eq!(
+            get_order_list(16, 3, true),
+            vec![1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1]
+        );
+        assert_eq!(
+            get_order_list(16, 1, true),
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        );
+        assert_eq!(
+            get_order_list(25, 1, true),
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        );
 
-        let list = get_order_list(2, 2, true);
+        assert_eq!(get_order_list(1, 1, true), vec![1]);
 
-        assert_eq!(2, list.len());
-        assert_eq!(vec![1, 2], list);
+        assert_eq!(get_order_list(2, 2, true), vec![1, 2]);
     }
 }
