@@ -1,3 +1,5 @@
+use tch::Tensor;
+
 use crate::schedulers::BetaSchedule;
 use crate::schedulers::PredictionType;
 
@@ -64,4 +66,47 @@ impl Default for DPMSolverSchedulerConfig {
             lower_order_final: true,
         }
     }
+}
+
+pub trait DPMSolverScheduler {
+    fn new(inference_steps: usize, config: DPMSolverSchedulerConfig) -> Self;
+    fn convert_model_output(
+        &self,
+        model_output: &Tensor,
+        timestep: usize,
+        sample: &Tensor,
+    ) -> Tensor;
+
+    fn first_order_update(
+        &self,
+        model_output: Tensor,
+        timestep: usize,
+        prev_timestep: usize,
+        sample: &Tensor,
+    ) -> Tensor;
+
+    fn second_order_update(
+        &self,
+        model_output_list: &Vec<Tensor>,
+        timestep_list: [usize; 2],
+        prev_timestep: usize,
+        sample: &Tensor,
+    ) -> Tensor;
+
+    fn third_order_update(
+        &self,
+        model_output_list: &Vec<Tensor>,
+        timestep_list: [usize; 3],
+        prev_timestep: usize,
+        sample: &Tensor,
+    ) -> Tensor;
+
+    fn step(&mut self, model_output: &Tensor, timestep: usize, sample: &Tensor) -> Tensor;
+
+    fn timesteps(&self) -> &[usize];
+    fn scale_model_input(&self, sample: Tensor, timestep: usize) -> Tensor;
+
+
+    fn add_noise(&self, original_samples: &Tensor, noise: Tensor, timestep: usize) -> Tensor;
+    fn init_noise_sigma(&self) -> f64;
 }

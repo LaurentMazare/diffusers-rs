@@ -1,4 +1,10 @@
-use super::{betas_for_alpha_bar, BetaSchedule, PredictionType, dpmsolver::{DPMSolverSchedulerConfig, DPMSolverAlgorithmType, DPMSolverType}};
+use super::{
+    betas_for_alpha_bar,
+    dpmsolver::{
+        DPMSolverAlgorithmType, DPMSolverScheduler, DPMSolverSchedulerConfig, DPMSolverType,
+    },
+    BetaSchedule, PredictionType,
+};
 use tch::{kind, Kind, Tensor};
 
 pub struct DPMSolverMultistepScheduler {
@@ -15,8 +21,8 @@ pub struct DPMSolverMultistepScheduler {
     pub config: DPMSolverSchedulerConfig,
 }
 
-impl DPMSolverMultistepScheduler {
-    pub fn new(inference_steps: usize, config: DPMSolverSchedulerConfig) -> Self {
+impl DPMSolverScheduler for DPMSolverMultistepScheduler {
+    fn new(inference_steps: usize, config: DPMSolverSchedulerConfig) -> Self {
         let betas = match config.beta_schedule {
             BetaSchedule::ScaledLinear => Tensor::linspace(
                 config.beta_start.sqrt(),
@@ -117,7 +123,7 @@ impl DPMSolverMultistepScheduler {
 
     ///  One step for the first-order DPM-Solver (equivalent to DDIM).
     ///  See https://arxiv.org/abs/2206.00927 for the detailed derivation.
-    fn dpm_solver_first_order_update(
+    fn first_order_update(
         &self,
         model_output: Tensor,
         timestep: usize,
@@ -139,7 +145,7 @@ impl DPMSolverMultistepScheduler {
     }
 
     ///  One step for the second-order multistep DPM-Solver.
-    fn multistep_dpm_solver_second_order_update(
+    fn second_order_update(
         &self,
         model_output_list: &Vec<Tensor>,
         timestep_list: [usize; 2],
@@ -192,7 +198,7 @@ impl DPMSolverMultistepScheduler {
     }
 
     /// One step for the third-order multistep DPM-Solver
-    fn multistep_dpm_solver_third_order_update(
+    fn third_order_update(
         &self,
         model_output_list: &Vec<Tensor>,
         timestep_list: [usize; 3],
@@ -237,11 +243,11 @@ impl DPMSolverMultistepScheduler {
         }
     }
 
-    pub fn timesteps(&self) -> &[usize] {
+    fn timesteps(&self) -> &[usize] {
         self.timesteps.as_slice()
     }
 
-    pub fn step(&mut self, model_output: &Tensor, timestep: usize, sample: &Tensor) -> Tensor {
+    fn step(&mut self, model_output: &Tensor, timestep: usize, sample: &Tensor) -> Tensor {
         // https://github.com/huggingface/diffusers/blob/e4fe9413121b78c4c1f109b50f0f3cc1c320a1a2/src/diffusers/schedulers/scheduling_dpmsolver_multistep.py#L457
         let step_index = self.timesteps.iter().position(|&t| t == timestep).unwrap();
 
@@ -266,24 +272,14 @@ impl DPMSolverMultistepScheduler {
             || self.lower_order_nums < 1
             || lower_order_final
         {
-            self.dpm_solver_first_order_update(model_output, timestep, prev_timestep, sample)
+            self.first_order_update(model_output, timestep, prev_timestep, sample)
         } else if self.config.solver_order == 2 || self.lower_order_nums < 2 || lower_order_second {
             let timestep_list = [self.timesteps[step_index - 1], timestep];
-            self.multistep_dpm_solver_second_order_update(
-                &self.model_outputs,
-                timestep_list,
-                prev_timestep,
-                sample,
-            )
+            self.second_order_update(&self.model_outputs, timestep_list, prev_timestep, sample)
         } else {
             let timestep_list =
                 [self.timesteps[step_index - 2], self.timesteps[step_index - 1], timestep];
-            self.multistep_dpm_solver_third_order_update(
-                &self.model_outputs,
-                timestep_list,
-                prev_timestep,
-                sample,
-            )
+            self.third_order_update(&self.model_outputs, timestep_list, prev_timestep, sample)
         };
 
         if self.lower_order_nums < self.config.solver_order {
@@ -293,12 +289,16 @@ impl DPMSolverMultistepScheduler {
         prev_sample
     }
 
-    pub fn add_noise(&self, original_samples: &Tensor, noise: Tensor, timestep: usize) -> Tensor {
+    fn add_noise(&self, original_samples: &Tensor, noise: Tensor, timestep: usize) -> Tensor {
         self.alphas_cumprod[timestep].sqrt() * original_samples.to_owned()
             + (1.0 - self.alphas_cumprod[timestep]).sqrt() * noise
     }
 
-    pub fn init_noise_sigma(&self) -> f64 {
+    fn init_noise_sigma(&self) -> f64 {
         self.init_noise_sigma
+    }
+
+    fn scale_model_input(&self, _sample: Tensor, _timestep: usize) -> Tensor {
+        todo!()
     }
 }
