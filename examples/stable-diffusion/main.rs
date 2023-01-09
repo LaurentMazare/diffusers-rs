@@ -69,8 +69,8 @@
 //   cargo run --release --example tensor-tools cp ./data/vae.npz ./data/vae.ot
 //   cargo run --release --example tensor-tools cp ./data/unet.npz ./data/unet.ot
 use clap::Parser;
-use diffusers::pipelines::stable_diffusion;
 use diffusers::transformers::clip;
+use diffusers::pipelines::stable_diffusion;
 use tch::{nn::Module, Device, Kind, Tensor};
 
 const GUIDANCE_SCALE: f64 = 7.5;
@@ -241,7 +241,6 @@ fn run(args: Args) -> anyhow::Result<()> {
     let clip_device = cpu_or_cuda("clip");
     let vae_device = cpu_or_cuda("vae");
     let unet_device = cpu_or_cuda("unet");
-    let scheduler = sd_config.build_scheduler(n_steps);
 
     let tokenizer = clip::Tokenizer::create(vocab_file, &sd_config.clip)?;
     println!("Running with prompt \"{prompt}\".");
@@ -273,6 +272,7 @@ fn run(args: Args) -> anyhow::Result<()> {
             (Kind::Float, unet_device),
         );
 
+        let scheduler = sd_config.build_scheduler(n_steps);
         for (timestep_index, &timestep) in scheduler.timesteps().iter().enumerate() {
             println!("Timestep {timestep_index}/{n_steps}");
             let latent_model_input = Tensor::cat(&[&latents, &latents], 0);
