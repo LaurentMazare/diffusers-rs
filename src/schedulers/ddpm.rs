@@ -119,6 +119,12 @@ impl DDPMScheduler {
         self.timesteps.as_slice()
     }
 
+    ///  Ensures interchangeability with schedulers that need to scale the denoising model input
+    /// depending on the current timestep.
+    pub fn scale_model_input(&self, sample: Tensor, _timestep: usize) -> Tensor {
+        sample
+    }
+
     pub fn step(&self, model_output: &Tensor, timestep: usize, sample: &Tensor) -> Tensor {
         // https://github.com/huggingface/diffusers/blob/df2b548e893ccb8a888467c2508756680df22821/src/diffusers/schedulers/scheduling_ddpm.py#L272
         // 1. compute alphas, betas

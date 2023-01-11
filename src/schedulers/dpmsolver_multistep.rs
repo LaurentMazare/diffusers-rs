@@ -304,6 +304,12 @@ impl DPMSolverMultistepScheduler {
         self.timesteps.as_slice()
     }
 
+    ///  Ensures interchangeability with schedulers that need to scale the denoising model input
+    /// depending on the current timestep.
+    pub fn scale_model_input(&self, sample: Tensor, _timestep: usize) -> Tensor {
+        sample
+    }
+
     pub fn step(&mut self, model_output: &Tensor, timestep: usize, sample: &Tensor) -> Tensor {
         // https://github.com/huggingface/diffusers/blob/e4fe9413121b78c4c1f109b50f0f3cc1c320a1a2/src/diffusers/schedulers/scheduling_dpmsolver_multistep.py#L457
         let step_index = self.timesteps.iter().position(|&t| t == timestep).unwrap();
