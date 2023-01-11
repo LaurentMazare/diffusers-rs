@@ -46,7 +46,7 @@ impl LMSDiscreteScheduler {
                 config.train_timesteps as i64,
                 kind::FLOAT_CPU,
             )
-                .square(),
+            .square(),
             BetaSchedule::Linear => Tensor::linspace(
                 config.beta_start,
                 config.beta_end,
