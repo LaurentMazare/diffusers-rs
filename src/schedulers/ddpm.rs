@@ -67,7 +67,6 @@ impl DDPMScheduler {
                 kind::FLOAT_CPU,
             )
             .square(),
-
             BetaSchedule::Linear => Tensor::linspace(
                 config.beta_start,
                 config.beta_end,
@@ -91,8 +90,8 @@ impl DDPMScheduler {
             (0..(config.train_timesteps)).step_by(step_ratio).rev().collect();
 
         Self {
-            alphas: Vec::<f64>::from(alphas),
-            betas: Vec::<f64>::from(betas),
+            alphas: alphas.into(),
+            betas: betas.into(),
             alphas_cumprod,
             init_noise_sigma: 1.0,
             timesteps,
@@ -103,11 +102,14 @@ impl DDPMScheduler {
     fn get_variance(&self, timestep: usize) -> f64 {
         let alpha_prod_t = self.alphas_cumprod[timestep];
         let alpha_prod_t_prev = if timestep > 0 { self.alphas_cumprod[timestep - 1] } else { 1.0 };
-
+        // For t > 0, compute predicted variance βt (see formula (6) and (7) from https://arxiv.org/pdf/2006.11239.pdf)
+        // and sample from it to get previous sample
+        // x_{t-1} ~ N(pred_prev_sample, variance) == add variance to pred_sample
         let variance = (1. - alpha_prod_t_prev) / (1. - alpha_prod_t) * self.betas[timestep];
 
         match self.config.variance_type {
             DDPMVarianceType::FixedSmall => variance.max(1e-20),
+            // for rl-diffuser https://arxiv.org/abs/2205.09991
             DDPMVarianceType::FixedSmallLog => variance.max(1e-20).ln(),
             DDPMVarianceType::FixedLarge => self.betas[timestep],
             DDPMVarianceType::FixedLargeLog => self.betas[timestep].ln(),

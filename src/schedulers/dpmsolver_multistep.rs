@@ -1,4 +1,5 @@
 use super::{betas_for_alpha_bar, BetaSchedule, PredictionType};
+use std::iter;
 use tch::{kind, Kind, Tensor};
 
 /// The algorithm type for the solver.
@@ -112,16 +113,15 @@ impl DPMSolverMultistepScheduler {
             .rev()
             .collect();
 
-        let mut model_outputs = Vec::<Tensor>::new();
-        for _ in 0..config.solver_order {
-            model_outputs.push(Tensor::new());
-        }
+        // creates a vector of `solver_order` empty tensors
+        // https://github.com/huggingface/diffusers/blob/e4fe9413121b78c4c1f109b50f0f3cc1c320a1a2/src/diffusers/schedulers/scheduling_dpmsolver_multistep.py#L206-L208
+        let model_outputs = iter::repeat_with(Tensor::new).take(config.solver_order).collect();
 
         Self {
-            alphas_cumprod: Vec::<f64>::from(alphas_cumprod),
-            alpha_t: Vec::<f64>::from(alpha_t),
-            sigma_t: Vec::<f64>::from(sigma_t),
-            lambda_t: Vec::<f64>::from(lambda_t),
+            alphas_cumprod: alphas_cumprod.into(),
+            alpha_t: alpha_t.into(),
+            sigma_t: sigma_t.into(),
+            lambda_t: lambda_t.into(),
             init_noise_sigma: 1.,
             lower_order_nums: 0,
             model_outputs,
