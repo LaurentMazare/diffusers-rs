@@ -37,9 +37,9 @@ pub struct DDPMSchedulerConfig {
 impl Default for DDPMSchedulerConfig {
     fn default() -> Self {
         Self {
-            beta_start: 0.0001,
-            beta_end: 0.02,
-            beta_schedule: BetaSchedule::Linear,
+            beta_start: 0.00085,
+            beta_end: 0.012,
+            beta_schedule: BetaSchedule::ScaledLinear,
             clip_sample: true,
             variance_type: DDPMVarianceType::FixedSmall,
             prediction_type: PredictionType::Epsilon,
