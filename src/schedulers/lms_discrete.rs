@@ -1,6 +1,6 @@
 use super::{interp, BetaSchedule, PredictionType};
-use rgsl::IntegrationWorkspace;
 use tch::{kind, Kind, Tensor};
+use super::integrate::integrate;
 
 #[derive(Debug, Clone)]
 pub struct LMSDiscreteSchedulerConfig {
@@ -33,7 +33,6 @@ pub struct LMSDiscreteScheduler {
     sigmas: Vec<f64>,
     init_noise_sigma: f64,
     derivatives: Vec<Tensor>,
-    integration_ws: IntegrationWorkspace,
     pub config: LMSDiscreteSchedulerConfig,
 }
 
@@ -75,15 +74,12 @@ impl LMSDiscreteScheduler {
 
         // standard deviation of the initial noise distribution
         let init_noise_sigma: f64 = sigmas.max().into();
-        // workspace for integration using gsl
-        let integration_ws = IntegrationWorkspace::new(config.train_timesteps).unwrap();
 
         Self {
             timesteps,
             sigmas: sigmas.into(),
             init_noise_sigma,
             derivatives: vec![],
-            integration_ws,
             config,
         }
     }
@@ -119,16 +115,14 @@ impl LMSDiscreteScheduler {
         // Absolute tolerances and limit are taken from
         // the defaults of `scipy.integrate.quad`
         // https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.quad.html
-        let integrated_coeff = self.integration_ws.qags(
+        let integration_out = integrate(
             lms_derivative,
             self.sigmas[t],
             self.sigmas[t + 1],
-            1.49e-8,
-            1e-4,
-            50,
+            1.49e-8
         );
-
-        integrated_coeff.1
+        // integrated coeff
+        integration_out.integral
     }
 
     pub fn step(
