@@ -1,6 +1,6 @@
+use super::integrate::integrate;
 use super::{interp, BetaSchedule, PredictionType};
 use tch::{kind, Kind, Tensor};
-use super::integrate::integrate;
 
 #[derive(Debug, Clone)]
 pub struct LMSDiscreteSchedulerConfig {
@@ -12,6 +12,9 @@ pub struct LMSDiscreteSchedulerConfig {
     pub beta_schedule: BetaSchedule,
     /// number of diffusion steps used to train the model.
     pub train_timesteps: usize,
+    /// coefficient for multi-step inference.
+    /// https://github.com/huggingface/diffusers/blob/9b37ed33b5fa09e594b38e4e6f7477beff3bd66a/src/diffusers/schedulers/scheduling_lms_discrete.py#L189
+    pub order: usize,
     /// prediction type of the scheduler function
     pub prediction_type: PredictionType,
 }
@@ -19,10 +22,11 @@ pub struct LMSDiscreteSchedulerConfig {
 impl Default for LMSDiscreteSchedulerConfig {
     fn default() -> Self {
         Self {
-            beta_start: 0.00085, // sensible defaults
+            beta_start: 0.00085,
             beta_end: 0.012,
-            beta_schedule: BetaSchedule::Linear,
+            beta_schedule: BetaSchedule::ScaledLinear,
             train_timesteps: 1000,
+            order: 4,
             prediction_type: PredictionType::Epsilon,
         }
     }
@@ -75,13 +79,7 @@ impl LMSDiscreteScheduler {
         // standard deviation of the initial noise distribution
         let init_noise_sigma: f64 = sigmas.max().into();
 
-        Self {
-            timesteps,
-            sigmas: sigmas.into(),
-            init_noise_sigma,
-            derivatives: vec![],
-            config,
-        }
+        Self { timesteps, sigmas: sigmas.into(), init_noise_sigma, derivatives: vec![], config }
     }
 
     pub fn timesteps(&self) -> &[f64] {
@@ -115,24 +113,13 @@ impl LMSDiscreteScheduler {
         // Absolute tolerances and limit are taken from
         // the defaults of `scipy.integrate.quad`
         // https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.quad.html
-        let integration_out = integrate(
-            lms_derivative,
-            self.sigmas[t],
-            self.sigmas[t + 1],
-            1.49e-8
-        );
+        let integration_out =
+            integrate(lms_derivative, self.sigmas[t], self.sigmas[t + 1], 1.49e-8);
         // integrated coeff
         integration_out.integral
     }
 
-    pub fn step(
-        &mut self,
-        model_output: &Tensor,
-        timestep: f64,
-        sample: &Tensor,
-        order: Option<usize>,
-    ) -> Tensor {
-        let order = order.unwrap_or(4);
+    pub fn step(&mut self, model_output: &Tensor, timestep: f64, sample: &Tensor) -> Tensor {
         let step_index = self.timesteps.iter().position(|&t| t == timestep).unwrap();
         let sigma = self.sigmas[step_index];
 
@@ -149,13 +136,13 @@ impl LMSDiscreteScheduler {
         // 2. Convert to an ODE derivative
         let derivative = (sample - pred_original_sample) / sigma;
         self.derivatives.push(derivative);
-        if self.derivatives.len() > order {
+        if self.derivatives.len() > self.config.order {
             // remove the first element
             self.derivatives.drain(0..1);
         }
 
         // 3. compute linear multistep coefficients
-        let order = order.min(step_index + 1);
+        let order = self.config.order.min(step_index + 1);
         let lms_coeffs: Vec<_> =
             (0..order).map(|o| self.get_lms_coefficient(order, step_index, o)).collect();
 
