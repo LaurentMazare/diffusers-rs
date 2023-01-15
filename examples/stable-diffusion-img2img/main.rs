@@ -215,6 +215,8 @@ fn run(args: Args) -> anyhow::Result<()> {
             }
             println!("Timestep {timestep_index}/{n_steps}");
             let latent_model_input = Tensor::cat(&[&latents, &latents], 0);
+            let latent_model_input = scheduler.scale_model_input(latent_model_input, timestep);
+
             let noise_pred = unet.forward(&latent_model_input, timestep as f64, &text_embeddings);
             let noise_pred = noise_pred.chunk(2, 0);
             let (noise_pred_uncond, noise_pred_text) = (&noise_pred[0], &noise_pred[1]);
