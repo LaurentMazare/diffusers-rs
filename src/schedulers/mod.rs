@@ -14,7 +14,6 @@ pub mod heun_discrete;
 mod integrate;
 pub mod lms_discrete;
 
-
 /// This represents how beta ranges from its minimum value to the maximum
 /// during training.
 #[derive(Debug, Clone, Copy)]
