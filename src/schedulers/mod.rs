@@ -11,6 +11,7 @@ pub mod dpmsolver_multistep;
 pub mod euler_ancestral_discrete;
 pub mod euler_discrete;
 pub mod heun_discrete;
+pub mod k_dpm_2_discrete;
 
 /// This represents how beta ranges from its minimum value to the maximum
 /// during training.
