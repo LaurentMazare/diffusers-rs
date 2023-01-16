@@ -12,6 +12,7 @@ pub mod euler_ancestral_discrete;
 pub mod euler_discrete;
 pub mod heun_discrete;
 mod integrate;
+pub mod k_dpm_2_discrete;
 pub mod lms_discrete;
 
 /// This represents how beta ranges from its minimum value to the maximum
