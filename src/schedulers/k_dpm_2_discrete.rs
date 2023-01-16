@@ -57,7 +57,7 @@ impl KDPM2DiscreteScheduler {
                 kind::FLOAT_CPU,
             ),
             _ => unimplemented!(
-                "HeunDiscreteScheduler only implements linear and scaled_linear betas."
+                "KDPM2DiscreteScheduler only implements linear and scaled_linear betas."
             ),
         };
 
@@ -205,7 +205,6 @@ impl KDPM2DiscreteScheduler {
             self.sigmas_interpol[step_index]
         };
 
-        // https://github.com/huggingface/diffusers/blob/aba2a65d6ab47c0d1c12fa47e9b238c1d3e34512/src/diffusers/schedulers/scheduling_heun_discrete.py#L106
         sample / (sigma.powi(2) + 1.).sqrt()
     }
 
