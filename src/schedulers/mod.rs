@@ -14,6 +14,7 @@ pub mod heun_discrete;
 mod integrate;
 pub mod k_dpm_2_discrete;
 pub mod lms_discrete;
+pub mod pndm;
 
 /// This represents how beta ranges from its minimum value to the maximum
 /// during training.
