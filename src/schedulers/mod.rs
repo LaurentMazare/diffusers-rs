@@ -7,7 +7,9 @@ use tch::{Kind, Tensor};
 
 pub mod ddim;
 pub mod ddpm;
+pub mod dpmsolver;
 pub mod dpmsolver_multistep;
+pub mod dpmsolver_singlestep;
 pub mod euler_ancestral_discrete;
 pub mod euler_discrete;
 pub mod heun_discrete;
