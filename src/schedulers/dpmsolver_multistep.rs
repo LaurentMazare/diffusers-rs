@@ -38,9 +38,17 @@ pub struct DPMSolverMultistepSchedulerConfig {
     pub solver_order: usize,
     /// prediction type of the scheduler function
     pub prediction_type: PredictionType,
+    /// whether to use the "dynamic thresholding" method (introduced by Imagen, https://arxiv.org/abs/2205.11487).
+    /// For pixel-space diffusion models, you can set both `algorithm_type=dpmsolver++` and `thresholding=True` to
+    /// use the dynamic thresholding. Note that the thresholding method is unsuitable for latent-space diffusion
+    /// models (such as stable-diffusion).
+    pub thresholding: bool,
+    /// the ratio for the dynamic thresholding method. Default is `0.995`, the same as Imagen
+    /// (https://arxiv.org/abs/2205.11487).
+    pub dynamic_thresholding_ratio: f64,
     /// The threshold value for dynamic thresholding. Valid only when `thresholding: true` and
     /// `algorithm_type: DPMSolverAlgorithmType::DPMSolverPlusPlus`.
-    pub sample_max_value: f32,
+    pub sample_max_value: f64,
     /// The algorithm type for the solver
     pub algorithm_type: DPMSolverAlgorithmType,
     /// The solver type for the second-order solver.
@@ -59,6 +67,8 @@ impl Default for DPMSolverMultistepSchedulerConfig {
             train_timesteps: 1000,
             solver_order: 2,
             prediction_type: PredictionType::Epsilon,
+            thresholding: false,
+            dynamic_thresholding_ratio: 0.995,
             sample_max_value: 1.0,
             algorithm_type: DPMSolverAlgorithmType::DPMSolverPlusPlus,
             solver_type: DPMSolverType::Midpoint,
@@ -146,7 +156,7 @@ impl DPMSolverMultistepScheduler {
     ) -> Tensor {
         match self.config.algorithm_type {
             DPMSolverAlgorithmType::DPMSolverPlusPlus => {
-                match self.config.prediction_type {
+                let mut x0_pred = match self.config.prediction_type {
                     PredictionType::Epsilon => {
                         let alpha_t = self.alpha_t[timestep];
                         let sigma_t = self.sigma_t[timestep];
@@ -158,9 +168,34 @@ impl DPMSolverMultistepScheduler {
                         let sigma_t = self.sigma_t[timestep];
                         alpha_t * sample - sigma_t * model_output
                     }
+                };
+                if self.config.thresholding {
+                    // Dynamic thresholding in https://arxiv.org/abs/2205.11487
+                    let dynamic_max_val =
+                        x0_pred.abs().reshape(&[x0_pred.size()[0], -1]).quantile_scalar(
+                            self.config.dynamic_thresholding_ratio,
+                            1,
+                            false,
+                            // default in torch.quantile
+                            "linear",
+                        );
+                    // this converts the following indexing pattern: (...,) + (None,) * (x0_pred.ndim-1)
+                    // https://github.com/huggingface/diffusers/blob/ed616bd8a8740927770eebe017aedb6204c6105f/src/diffusers/schedulers/scheduling_dpmsolver_multistep.py#L266
+                    let shape = [dynamic_max_val.size(), vec![1; x0_pred.dim() - 1]].concat();
+                    let dynamic_max_val = dynamic_max_val
+                        .maximum(
+                            &(dynamic_max_val.ones_like().to(dynamic_max_val.device())
+                                * self.config.sample_max_value),
+                        )
+                        .view(shape.as_slice());
+
+                    x0_pred = x0_pred.clamp_tensor(
+                        Some(-dynamic_max_val.shallow_clone()),
+                        Some(dynamic_max_val.shallow_clone()),
+                    ) / dynamic_max_val;
                 }
-                // TODO: implement Dynamic thresholding
-                // https://arxiv.org/abs/2205.11487
+
+                x0_pred
             }
             DPMSolverAlgorithmType::DPMSolver => match self.config.prediction_type {
                 PredictionType::Epsilon => model_output.shallow_clone(),
