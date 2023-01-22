@@ -57,7 +57,7 @@ pub(crate) fn betas_for_alpha_bar(num_diffusion_timesteps: usize, max_beta: f64)
 /// points, mimicking np.interp().
 ///
 /// Based on https://github.com/pytorch/pytorch/issues/50334#issuecomment-1000917964
-pub fn interp(x: &[f64], xp: Tensor, yp: Tensor) -> Tensor {
+pub fn interp(x: &Tensor, xp: Tensor, yp: Tensor) -> Tensor {
     // (yp[1:] - yp[:-1]) / (xp[1:] - xp[:-1])
     let m = (yp.slice(0, 1, None, 1) - yp.slice(0, 0, -1, 1))
         / (xp.slice(0, 1, None, 1) - xp.slice(0, 0, -1, 1));
@@ -65,11 +65,11 @@ pub fn interp(x: &[f64], xp: Tensor, yp: Tensor) -> Tensor {
     // yp[:-1] - (m * xp[:-1])
     let b = yp.slice(0, 0, -1, 1) - (&m * xp.slice(0, 0, -1, 1));
 
-    let mut tensors = vec![];
-    for &t in x.iter() {
-        tensors.push(xp.le(t).sum(Kind::Int64) - 1);
-    }
-    let indices = Tensor::stack(&tensors, 0).clamp(0, m.size1().unwrap() - 1);
+    // torch.sum(torch.ge(x[:, None], xp[None, :]), 1) - 1
+    let indices = x.unsqueeze(-1).ge_tensor(&xp.unsqueeze(0));
+    let indices = indices.sum_dim_intlist([1].as_slice(), false, Kind::Int64) - 1;
+    // torch.clamp(indicies, 0, len(m) - 1)
+    let indices = indices.clamp(0, m.size1().unwrap() - 1);
 
-    m.take(&indices) * Tensor::of_slice(x) + b.take(&indices)
+    m.take(&indices) * x + b.take(&indices)
 }

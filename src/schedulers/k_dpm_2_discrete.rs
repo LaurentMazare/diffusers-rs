@@ -1,5 +1,5 @@
 use super::{interp, BetaSchedule, PredictionType};
-use tch::{kind, Kind, Tensor};
+use tch::{kind, IndexOp, Kind, Tensor};
 
 #[derive(Debug, Clone)]
 pub struct KDPM2DiscreteSchedulerConfig {
@@ -64,20 +64,18 @@ impl KDPM2DiscreteScheduler {
         let alphas: Tensor = 1. - betas;
         let alphas_cumprod = alphas.cumprod(0, Kind::Double);
 
-        // https://github.com/huggingface/diffusers/blob/9b37ed33b5fa09e594b38e4e6f7477beff3bd66a/src/diffusers/schedulers/scheduling_k_dpm_2_discrete.py#L133
         let timesteps = Tensor::linspace(
             (config.train_timesteps - 1) as f64,
             0.,
             inference_steps as i64,
             kind::FLOAT_CPU,
         );
-        let timesteps_arr = Vec::<f64>::from(&timesteps);
 
         let sigmas = ((1. - &alphas_cumprod) as Tensor / alphas_cumprod).sqrt();
         let log_sigmas = sigmas.log();
 
         let sigmas = interp(
-            &timesteps_arr, // x-coordinates at which to evaluate the interpolated values
+            &timesteps, // x-coordinates at which to evaluate the interpolated values
             Tensor::range(0, sigmas.size1().unwrap() - 1, kind::FLOAT_CPU),
             sigmas,
         );
@@ -91,11 +89,11 @@ impl KDPM2DiscreteScheduler {
         let sigmas = Tensor::cat(
             &[
                 // sigmas[:1]
-                sigmas.get(0).reshape(&[1]),
+                sigmas.i(..1),
                 // sigmas[1:].repeat_interleave(2)
-                sigmas.slice(0, 1, None, 1).repeat_interleave_self_int(2, 0, None),
+                sigmas.i(1..).repeat_interleave_self_int(2, 0, None),
                 //sigmas[-1:]
-                sigmas.get(-1).reshape(&[1]),
+                sigmas.i(-1..0),
             ],
             0,
         );
@@ -109,7 +107,7 @@ impl KDPM2DiscreteScheduler {
                 // timesteps_interpol[1:-1, None]
                 timesteps_interpol.slice(0, 1, -1, 1).unsqueeze(-1),
                 // timesteps[1:, None]
-                timesteps.slice(0, 1, None, 1).unsqueeze(-1),
+                timesteps.i(1..).unsqueeze(-1),
             ],
             -1,
         )
@@ -119,11 +117,11 @@ impl KDPM2DiscreteScheduler {
         let sigmas_interpol = Tensor::cat(
             &[
                 // sigmas_interpol[:1]
-                sigmas_interpol.get(0).reshape(&[1]),
+                sigmas_interpol.i(..1),
                 // sigmas_interpol[1:].repeat_interleave(2)
-                sigmas_interpol.slice(0, 1, None, 1).repeat_interleave_self_int(2, 0, None),
+                sigmas_interpol.i(1..).repeat_interleave_self_int(2, 0, None),
                 //sigmas_interpol[-1:]
-                sigmas_interpol.get(-1).reshape(&[1]),
+                sigmas_interpol.i(-1..0),
             ],
             0,
         );
@@ -131,7 +129,7 @@ impl KDPM2DiscreteScheduler {
         let timesteps = Tensor::cat(
             &[
                 // timesteps[:1]
-                timesteps.get(0).reshape(&[1]),
+                timesteps.i(..1),
                 interleaved_timesteps,
             ],
             0,
