@@ -1,5 +1,5 @@
 use super::{interp, BetaSchedule, PredictionType};
-use tch::{kind, Kind, Tensor};
+use tch::{kind, IndexOp, Kind, Tensor};
 
 #[derive(Debug, Clone)]
 pub struct HeunDiscreteSchedulerConfig {
@@ -61,7 +61,6 @@ impl HeunDiscreteScheduler {
         let alphas: Tensor = 1. - betas;
         let alphas_cumprod = alphas.cumprod(0, Kind::Double);
 
-        // https://github.com/huggingface/diffusers/blob/aba2a65d6ab47c0d1c12fa47e9b238c1d3e34512/src/diffusers/schedulers/scheduling_heun_discrete.py#L128
         let timesteps = Tensor::linspace(
             (config.train_timesteps - 1) as f64,
             0.,
@@ -69,26 +68,22 @@ impl HeunDiscreteScheduler {
             kind::FLOAT_CPU,
         );
 
-        let timesteps_arr = Vec::<f64>::from(&timesteps);
-
         let sigmas = ((1. - &alphas_cumprod) as Tensor / &alphas_cumprod).sqrt();
         let sigmas = interp(
-            &timesteps_arr, // x-coordinates at which to evaluate the interpolated values
+            &timesteps, // x-coordinates at which to evaluate the interpolated values
             Tensor::range(0, sigmas.size1().unwrap() - 1, kind::FLOAT_CPU),
             sigmas,
         );
-        // append 0.0
-        let sigmas = Tensor::concat(&[sigmas, Tensor::of_slice(&[0.0])], 0);
 
-        // https://github.com/huggingface/diffusers/blob/aba2a65d6ab47c0d1c12fa47e9b238c1d3e34512/src/diffusers/schedulers/scheduling_heun_discrete.py#L134
+        // https://github.com/huggingface/diffusers/blob/aba2a65d6ab47c0d1c12fa47e9b238c1d3e34512/src/diffusers/schedulers/scheduling_heun_discrete.py#L132-L134
         let sigmas = Tensor::cat(
             &[
                 // sigmas[:1]
-                sigmas.get(0).reshape(&[1]),
-                // sigmas[1:-1].repeat_interleave(2)
-                sigmas.slice(0, 1, -1, 1).repeat_interleave_self_int(2, 0, None),
-                //sigmas[-1:]
-                sigmas.get(-1).reshape(&[1]),
+                sigmas.i(..1),
+                // sigmas[1:].repeat_interleave(2)
+                sigmas.i(1..).repeat_interleave_self_int(2, 0, None),
+                // append 0.0
+                Tensor::of_slice(&[0.0]),
             ],
             0,
         );
@@ -99,9 +94,9 @@ impl HeunDiscreteScheduler {
         let timesteps = Tensor::cat(
             &[
                 // timesteps[:1]
-                timesteps.get(0).reshape(&[1]),
+                timesteps.i(..1),
                 // timesteps[1:].repeat_interleave(2)
-                timesteps.slice(0, 1, None, 1).repeat_interleave_self_int(2, 0, None),
+                timesteps.i(1..).repeat_interleave_self_int(2, 0, None),
             ],
             0,
         );

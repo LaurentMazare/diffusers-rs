@@ -63,9 +63,12 @@ impl EulerDiscreteScheduler {
         let alphas: Tensor = 1. - betas;
         let alphas_cumprod = alphas.cumprod(0, Kind::Double);
 
-        // https://github.com/huggingface/diffusers/blob/2bd53a940c60d13421d9e8887af96b30a53c1b95/src/diffusers/schedulers/scheduling_euler_discrete.py#L149
-        let step = (config.train_timesteps - 1) as f64 / (inference_steps - 1) as f64;
-        let timesteps: Vec<f64> = (0..inference_steps).map(|i| i as f64 * step).rev().collect();
+        let timesteps = Tensor::linspace(
+            (config.train_timesteps - 1) as f64,
+            0.,
+            inference_steps as i64,
+            kind::FLOAT_CPU,
+        );
 
         let sigmas = ((1. - &alphas_cumprod) as Tensor / &alphas_cumprod).sqrt();
         let sigmas = interp(
@@ -73,13 +76,12 @@ impl EulerDiscreteScheduler {
             Tensor::range(0, sigmas.size1().unwrap() - 1, kind::FLOAT_CPU),
             sigmas,
         );
+        let sigmas = Tensor::concat(&[sigmas, Tensor::of_slice(&[0.0])], 0);
 
-        let mut sigmas = Vec::<f64>::from(sigmas);
-        sigmas.push(0.0);
+        // standard deviation of the initial noise distribution
+        let init_noise_sigma: f64 = sigmas.max().into();
 
-        // extracts max of sigmas, i.e. sigmas.max()
-        let init_noise_sigma = *sigmas.iter().max_by(|a, b| a.total_cmp(b)).unwrap();
-        Self { timesteps, sigmas, init_noise_sigma, config }
+        Self { timesteps: timesteps.into(), sigmas: sigmas.into(), init_noise_sigma, config }
     }
 
     pub fn timesteps(&self) -> &[f64] {
