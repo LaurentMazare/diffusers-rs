@@ -3,7 +3,7 @@
 //! Noise schedulers can be used to set the trade-off between
 //! inference speed and quality.
 
-use tch::{Kind, Tensor};
+use tch::{IndexOp, Kind, Tensor};
 
 pub mod ddim;
 pub mod ddpm;
@@ -12,6 +12,7 @@ pub mod euler_ancestral_discrete;
 pub mod euler_discrete;
 pub mod heun_discrete;
 mod integrate;
+pub mod k_dpm_2_ancestral_discrete;
 pub mod k_dpm_2_discrete;
 pub mod lms_discrete;
 pub mod pndm;
@@ -59,17 +60,19 @@ pub(crate) fn betas_for_alpha_bar(num_diffusion_timesteps: usize, max_beta: f64)
 ///
 /// Based on https://github.com/pytorch/pytorch/issues/50334#issuecomment-1000917964
 pub fn interp(x: &Tensor, xp: Tensor, yp: Tensor) -> Tensor {
+    assert_eq!(xp.size(), yp.size());
+    let sz = xp.size1().unwrap();
+
     // (yp[1:] - yp[:-1]) / (xp[1:] - xp[:-1])
-    let m = (yp.slice(0, 1, None, 1) - yp.slice(0, 0, -1, 1))
-        / (xp.slice(0, 1, None, 1) - xp.slice(0, 0, -1, 1));
+    let m = (yp.i(1..) - yp.i(..sz - 1)) / (xp.i(1..) - xp.i(..sz - 1));
 
     // yp[:-1] - (m * xp[:-1])
-    let b = yp.slice(0, 0, -1, 1) - (&m * xp.slice(0, 0, -1, 1));
+    let b = yp.i(..sz - 1) - (&m * xp.i(..sz - 1));
 
     // torch.sum(torch.ge(x[:, None], xp[None, :]), 1) - 1
     let indices = x.unsqueeze(-1).ge_tensor(&xp.unsqueeze(0));
     let indices = indices.sum_dim_intlist([1].as_slice(), false, Kind::Int64) - 1;
-    // torch.clamp(indicies, 0, len(m) - 1)
+    // torch.clamp(indices, 0, len(m) - 1)
     let indices = indices.clamp(0, m.size1().unwrap() - 1);
 
     m.take(&indices) * x + b.take(&indices)
