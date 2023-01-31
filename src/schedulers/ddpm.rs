@@ -40,7 +40,7 @@ impl Default for DDPMSchedulerConfig {
             beta_start: 0.00085,
             beta_end: 0.012,
             beta_schedule: BetaSchedule::ScaledLinear,
-            clip_sample: true,
+            clip_sample: false,
             variance_type: DDPMVarianceType::FixedSmall,
             prediction_type: PredictionType::Epsilon,
             train_timesteps: 1000,
@@ -49,11 +49,10 @@ impl Default for DDPMSchedulerConfig {
 }
 
 pub struct DDPMScheduler {
-    alphas: Vec<f64>,
-    betas: Vec<f64>,
     alphas_cumprod: Vec<f64>,
     init_noise_sigma: f64,
     timesteps: Vec<usize>,
+    step_ratio: usize,
     pub config: DDPMSchedulerConfig,
 }
 
@@ -78,7 +77,7 @@ impl DDPMScheduler {
         };
 
         // &betas to avoid moving it
-        let alphas: Tensor = 1. - &betas;
+        let alphas: Tensor = 1. - betas;
         let alphas_cumprod = Vec::<f64>::from(alphas.cumprod(0, Kind::Double));
 
         // min(train_timesteps, inference_steps)
@@ -86,33 +85,33 @@ impl DDPMScheduler {
         let inference_steps = inference_steps.min(config.train_timesteps);
         // arange the number of the scheduler's timesteps
         let step_ratio = config.train_timesteps / inference_steps;
-        let timesteps: Vec<usize> =
-            (0..(config.train_timesteps)).step_by(step_ratio).rev().collect();
+        let timesteps: Vec<usize> = (0..inference_steps).map(|s| s * step_ratio).rev().collect();
 
-        Self {
-            alphas: alphas.into(),
-            betas: betas.into(),
-            alphas_cumprod,
-            init_noise_sigma: 1.0,
-            timesteps,
-            config,
-        }
+        Self { alphas_cumprod, init_noise_sigma: 1.0, timesteps, step_ratio, config }
     }
 
     fn get_variance(&self, timestep: usize) -> f64 {
+        let prev_t = timestep as isize - self.step_ratio as isize;
         let alpha_prod_t = self.alphas_cumprod[timestep];
-        let alpha_prod_t_prev = if timestep > 0 { self.alphas_cumprod[timestep - 1] } else { 1.0 };
+        let alpha_prod_t_prev =
+            if prev_t >= 0 { self.alphas_cumprod[prev_t as usize] } else { 1.0 };
+        let current_beta_t = 1. - alpha_prod_t / alpha_prod_t_prev;
+
         // For t > 0, compute predicted variance βt (see formula (6) and (7) from https://arxiv.org/pdf/2006.11239.pdf)
         // and sample from it to get previous sample
         // x_{t-1} ~ N(pred_prev_sample, variance) == add variance to pred_sample
-        let variance = (1. - alpha_prod_t_prev) / (1. - alpha_prod_t) * self.betas[timestep];
+        let variance = (1. - alpha_prod_t_prev) / (1. - alpha_prod_t) * current_beta_t;
 
+        // retrieve variance
         match self.config.variance_type {
             DDPMVarianceType::FixedSmall => variance.max(1e-20),
             // for rl-diffuser https://arxiv.org/abs/2205.09991
-            DDPMVarianceType::FixedSmallLog => variance.max(1e-20).ln(),
-            DDPMVarianceType::FixedLarge => self.betas[timestep],
-            DDPMVarianceType::FixedLargeLog => self.betas[timestep].ln(),
+            DDPMVarianceType::FixedSmallLog => {
+                let variance = variance.max(1e-20).ln();
+                (variance * 0.5).exp()
+            }
+            DDPMVarianceType::FixedLarge => current_beta_t,
+            DDPMVarianceType::FixedLargeLog => current_beta_t.ln(),
             DDPMVarianceType::Learned => variance,
         }
     }
@@ -128,12 +127,17 @@ impl DDPMScheduler {
     }
 
     pub fn step(&self, model_output: &Tensor, timestep: usize, sample: &Tensor) -> Tensor {
+        let prev_t = timestep as isize - self.step_ratio as isize;
+
         // https://github.com/huggingface/diffusers/blob/df2b548e893ccb8a888467c2508756680df22821/src/diffusers/schedulers/scheduling_ddpm.py#L272
         // 1. compute alphas, betas
         let alpha_prod_t = self.alphas_cumprod[timestep];
-        let alpha_prod_t_prev = if timestep > 0 { self.alphas_cumprod[timestep - 1] } else { 1.0 };
+        let alpha_prod_t_prev =
+            if prev_t >= 0 { self.alphas_cumprod[prev_t as usize] } else { 1.0 };
         let beta_prod_t = 1. - alpha_prod_t;
         let beta_prod_t_prev = 1. - alpha_prod_t_prev;
+        let current_alpha_t = alpha_prod_t / alpha_prod_t_prev;
+        let current_beta_t = 1. - current_alpha_t;
 
         // 2. compute predicted original sample from predicted noise also called "predicted x_0" of formula (15)
         let mut pred_original_sample = match self.config.prediction_type {
@@ -153,9 +157,8 @@ impl DDPMScheduler {
 
         // 4. Compute coefficients for pred_original_sample x_0 and current sample x_t
         // See formula (7) from https://arxiv.org/pdf/2006.11239.pdf
-        let pred_original_sample_coeff =
-            (alpha_prod_t_prev.sqrt() * self.betas[timestep]) / beta_prod_t;
-        let current_sample_coeff = self.alphas[timestep].sqrt() * beta_prod_t_prev / beta_prod_t;
+        let pred_original_sample_coeff = (alpha_prod_t_prev.sqrt() * current_beta_t) / beta_prod_t;
+        let current_sample_coeff = current_alpha_t.sqrt() * beta_prod_t_prev / beta_prod_t;
 
         // 5. Compute predicted previous sample µ_t
         // See formula (7) from https://arxiv.org/pdf/2006.11239.pdf
