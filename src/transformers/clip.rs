@@ -371,7 +371,7 @@ impl Tokenizer {
             vocab.push(elem.into())
         }
         for (_index, elem) in BYTES_TO_UNICODE {
-            vocab.push(format!("{}</w>", elem));
+            vocab.push(format!("{elem}</w>"));
         }
         for elem in bpe_lines.iter() {
             vocab.push(format!("{}{}", elem.0, elem.1))
@@ -440,7 +440,7 @@ impl Tokenizer {
             while index < word.len() {
                 let w = &word[index];
                 if index + 1 < word.len() && w == first && &word[index + 1] == second {
-                    new_word.push(format!("{}{}", first, second));
+                    new_word.push(format!("{first}{second}"));
                     index += 2
                 } else {
                     new_word.push(w.clone());
