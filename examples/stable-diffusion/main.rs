@@ -184,9 +184,9 @@ fn output_filename(
 ) -> String {
     let filename = if num_samples > 1 {
         match basename.rsplit_once('.') {
-            None => format!("{}.{}.png", basename, sample_idx),
+            None => format!("{basename}.{sample_idx}.png"),
             Some((filename_no_extension, extension)) => {
-                format!("{}.{}.{}", filename_no_extension, sample_idx, extension)
+                format!("{filename_no_extension}.{sample_idx}.{extension}")
             }
         }
     } else {
@@ -195,9 +195,9 @@ fn output_filename(
     match timestep_idx {
         None => filename,
         Some(timestep_idx) => match filename.rsplit_once('.') {
-            None => format!("{}-{}.png", filename, timestep_idx),
+            None => format!("{filename}-{timestep_idx}.png"),
             Some((filename_no_extension, extension)) => {
-                format!("{}-{}.{}", filename_no_extension, timestep_idx, extension)
+                format!("{filename_no_extension}-{timestep_idx}.{extension}")
             }
         },
     }
