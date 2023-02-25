@@ -230,17 +230,18 @@ fn run(args: Args) -> anyhow::Result<()> {
             stable_diffusion::StableDiffusionConfig::v2_1(sliced_attention_size)
         }
     };
-    let cuda_device = Device::cuda_if_available();
-    let cpu_or_cuda = |name: &str| {
+    let accelerator_device =
+        if tch::utils::has_mps() { Device::Mps } else { Device::cuda_if_available() };
+    let cpu_or_accelerator = |name: &str| {
         if cpu.iter().any(|c| c == "all" || c == name) {
             Device::Cpu
         } else {
-            cuda_device
+            accelerator_device
         }
     };
-    let clip_device = cpu_or_cuda("clip");
-    let vae_device = cpu_or_cuda("vae");
-    let unet_device = cpu_or_cuda("unet");
+    let clip_device = cpu_or_accelerator("clip");
+    let vae_device = cpu_or_accelerator("vae");
+    let unet_device = cpu_or_accelerator("unet");
     let scheduler = sd_config.build_scheduler(n_steps);
 
     let tokenizer = clip::Tokenizer::create(vocab_file, &sd_config.clip)?;
