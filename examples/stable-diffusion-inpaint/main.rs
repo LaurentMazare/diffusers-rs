@@ -163,19 +163,12 @@ fn run(args: Args) -> anyhow::Result<()> {
             stable_diffusion::StableDiffusionConfig::v2_1(sliced_attention_size)
         }
     };
-    let cuda_device = Device::cuda_if_available();
-    let cpu_or_cuda = |name: &str| {
-        if cpu.iter().any(|c| c == "all" || c == name) {
-            Device::Cpu
-        } else {
-            cuda_device
-        }
-    };
     let (mask, masked_image) = prepare_mask_and_masked_image(input_image, mask_image)?;
     println!("Loaded input image and mask, {:?} {:?}.", masked_image.size(), mask.size());
-    let clip_device = cpu_or_cuda("clip");
-    let vae_device = cpu_or_cuda("vae");
-    let unet_device = cpu_or_cuda("unet");
+    let device_setup = diffusers::utils::DeviceSetup::new(cpu);
+    let clip_device = device_setup.get("clip");
+    let vae_device = device_setup.get("vae");
+    let unet_device = device_setup.get("unet");
     let scheduler = sd_config.build_scheduler(n_steps);
 
     let tokenizer = clip::Tokenizer::create(vocab_file, &sd_config.clip)?;
