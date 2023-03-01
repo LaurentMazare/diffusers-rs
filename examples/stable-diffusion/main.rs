@@ -222,7 +222,7 @@ fn run(args: Args) -> anyhow::Result<()> {
     tch::maybe_init_cuda();
     println!("Cuda available: {}", tch::Cuda::is_available());
     println!("Cudnn available: {}", tch::Cuda::cudnn_is_available());
-    println!("MPS available: {}", tch::utils::has());
+    println!("MPS available: {}", tch::utils::has_mps());
 
     let sd_config = match sd_version {
         StableDiffusionVersion::V1_5 => {

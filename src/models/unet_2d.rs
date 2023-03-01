@@ -106,8 +106,8 @@ impl UNet2DConditionModel {
 
                 // Enable automatic attention slicing if the config sliced_attention_size is set to 0.
                 let sliced_attention_size = match config.sliced_attention_size {
-                    Some(s) => if s == 0 { Some(attention_head_dim / 2) } else { None },
-                    None => None,
+                    Some(0) => { Some(attention_head_dim / 2) },
+                    _ => config.sliced_attention_size,
                 };
 
                 let in_channels =
@@ -173,8 +173,8 @@ impl UNet2DConditionModel {
 
                 // Enable automatic attention slicing if the config sliced_attention_size is set to 0.
                 let sliced_attention_size = match config.sliced_attention_size {
-                    Some(s) => if s == 0 { Some(attention_head_dim / 2) } else { None },
-                    None => None,
+                    Some(0) => { Some(attention_head_dim / 2) },
+                    _ => config.sliced_attention_size,
                 };
 
                 let prev_out_channels =
