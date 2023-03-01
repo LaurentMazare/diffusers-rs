@@ -103,6 +103,13 @@ impl UNet2DConditionModel {
             .map(|i| {
                 let BlockConfig { out_channels, use_cross_attn, attention_head_dim } =
                     config.blocks[i];
+
+                // Enable automatic attention slicing if the config sliced_attention_size is set to 0.
+                let sliced_attention_size = match config.sliced_attention_size {
+                    Some(0) => { Some(attention_head_dim / 2) },
+                    _ => config.sliced_attention_size,
+                };
+
                 let in_channels =
                     if i > 0 { config.blocks[i - 1].out_channels } else { b_channels };
                 let db_cfg = DownBlock2DConfig {
@@ -118,7 +125,7 @@ impl UNet2DConditionModel {
                         downblock: db_cfg,
                         attn_num_head_channels: attention_head_dim,
                         cross_attention_dim: config.cross_attention_dim,
-                        sliced_attention_size: config.sliced_attention_size,
+                        sliced_attention_size,
                         use_linear_projection: config.use_linear_projection,
                     };
                     let block = CrossAttnDownBlock2D::new(
@@ -163,6 +170,13 @@ impl UNet2DConditionModel {
             .map(|i| {
                 let BlockConfig { out_channels, use_cross_attn, attention_head_dim } =
                     config.blocks[n_blocks - 1 - i];
+
+                // Enable automatic attention slicing if the config sliced_attention_size is set to 0.
+                let sliced_attention_size = match config.sliced_attention_size {
+                    Some(0) => { Some(attention_head_dim / 2) },
+                    _ => config.sliced_attention_size,
+                };
+
                 let prev_out_channels =
                     if i > 0 { config.blocks[n_blocks - i].out_channels } else { bl_channels };
                 let in_channels = {
@@ -181,7 +195,7 @@ impl UNet2DConditionModel {
                         upblock: ub_cfg,
                         attn_num_head_channels: attention_head_dim,
                         cross_attention_dim: config.cross_attention_dim,
-                        sliced_attention_size: config.sliced_attention_size,
+                        sliced_attention_size,
                         use_linear_projection: config.use_linear_projection,
                     };
                     let block = CrossAttnUpBlock2D::new(
