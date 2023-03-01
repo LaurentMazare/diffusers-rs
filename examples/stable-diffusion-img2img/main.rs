@@ -47,7 +47,7 @@ struct Args {
     /// The file specifying the vocabulary to used for tokenization.
     vocab_file: String,
 
-    /// The size of the sliced attention or 0 to disable slicing (default)
+    /// The size of the sliced attention or 0 for automatic slicing (disabled by default)
     #[arg(long)]
     sliced_attention_size: Option<i64>,
 

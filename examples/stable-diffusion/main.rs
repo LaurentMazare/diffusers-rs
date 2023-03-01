@@ -106,7 +106,7 @@ struct Args {
     /// The file specifying the vocabulary to used for tokenization.
     vocab_file: String,
 
-    /// The size of the sliced attention or 0 to disable slicing (default)
+    /// The size of the sliced attention or 0 for automatic slicing (disabled by default)
     #[arg(long)]
     sliced_attention_size: Option<i64>,
 
@@ -222,6 +222,8 @@ fn run(args: Args) -> anyhow::Result<()> {
     tch::maybe_init_cuda();
     println!("Cuda available: {}", tch::Cuda::is_available());
     println!("Cudnn available: {}", tch::Cuda::cudnn_is_available());
+    println!("MPS available: {}", tch::utils::has());
+
     let sd_config = match sd_version {
         StableDiffusionVersion::V1_5 => {
             stable_diffusion::StableDiffusionConfig::v1_5(sliced_attention_size)

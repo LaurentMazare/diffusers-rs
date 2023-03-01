@@ -58,7 +58,7 @@ struct Args {
     #[arg(long, value_name = "FILE")]
     vae_weights: Option<String>,
 
-    /// The size of the sliced attention or 0 to disable slicing (default)
+    /// The size of the sliced attention or 0 for automatic slicing (disabled by default)
     #[arg(long)]
     sliced_attention_size: Option<i64>,
 
