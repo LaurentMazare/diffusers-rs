@@ -12,3 +12,4 @@ __pycache__
 .*~
 sd_*jpg
 sd_*png
+.idea/

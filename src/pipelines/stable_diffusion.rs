@@ -2,7 +2,11 @@ use crate::models::{unet_2d, vae};
 use crate::schedulers::ddim;
 use crate::schedulers::PredictionType;
 use crate::transformers::clip;
-use tch::{nn, Device};
+use safetensors::tensor::{Dtype, SafeTensors};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use tch::nn::Variables;
+use tch::{nn, Device, TchError, Tensor};
 
 #[derive(Clone, Debug)]
 pub struct StableDiffusionConfig {
@@ -113,7 +117,11 @@ impl StableDiffusionConfig {
         let mut vs_unet = nn::VarStore::new(device);
         let unet =
             unet_2d::UNet2DConditionModel::new(vs_unet.root(), in_channels, 4, self.unet.clone());
-        vs_unet.load(unet_weights)?;
+        if unet_weights.ends_with("safetensors") {
+            safe_tensor_to_var_store(&mut vs_unet.variables_, unet_weights)?
+        } else {
+            vs_unet.load(unet_weights)?
+        }
         Ok(unet)
     }
 
@@ -131,4 +139,44 @@ impl StableDiffusionConfig {
         vs.load(clip_weights)?;
         Ok(text_model)
     }
+}
+
+fn safe_tensor_to_var_store(store: &mut Arc<Mutex<Variables>>, path: &str) -> anyhow::Result<()> {
+    let buffer = std::fs::read(path)?;
+    let body = SafeTensors::deserialize(&buffer)?;
+    let mut named_tensors = HashMap::new();
+    for (name, tensor) in body.tensors() {
+        named_tensors.insert(name, tensor);
+    }
+    let mut variables = store.lock().unwrap();
+    for (name, var) in variables.named_variables.iter_mut() {
+        match named_tensors.get(name) {
+            Some(src) => {
+                let kind = dtype_to_tkind(&src.dtype());
+                let size = shape_to_size(&src.shape());
+                let tensor = Tensor::f_of_data_size(src.data(), &size, kind)?;
+                tch::no_grad(|| var.f_copy_(&tensor).map_err(|e| e.path_context(name)))?
+            }
+            None => {
+                Err(TchError::TensorNameNotFound(name.to_string(), path.to_string()))?;
+            }
+        }
+    }
+    Ok(())
+}
+
+#[inline]
+fn dtype_to_tkind(dtype: &Dtype) -> tch::Kind {
+    match dtype {
+        Dtype::F16 => tch::Kind::Half,
+        Dtype::BF16 => tch::Kind::BFloat16,
+        Dtype::F32 => tch::Kind::Float,
+        Dtype::F64 => tch::Kind::Double,
+        _ => unimplemented!(),
+    }
+}
+
+#[inline]
+fn shape_to_size(shape: &[usize]) -> Vec<i64> {
+    shape.iter().map(|x| *x as i64).collect()
 }
