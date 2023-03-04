@@ -90,6 +90,14 @@ struct Args {
     #[arg(long)]
     cpu: Vec<String>,
 
+    /// The height in pixels of the generated image.
+    #[arg(long)]
+    height: Option<i64>,
+
+    /// The width in pixels of the generated image.
+    #[arg(long)]
+    width: Option<i64>,
+
     /// The UNet weight file, in .ot format.
     #[arg(long, value_name = "FILE")]
     unet_weights: Option<String>,
@@ -210,6 +218,8 @@ fn run(args: Args) -> anyhow::Result<()> {
     let Args {
         prompt,
         cpu,
+        height,
+        width,
         n_steps,
         seed,
         vocab_file,
@@ -226,12 +236,13 @@ fn run(args: Args) -> anyhow::Result<()> {
 
     let sd_config = match sd_version {
         StableDiffusionVersion::V1_5 => {
-            stable_diffusion::StableDiffusionConfig::v1_5(sliced_attention_size)
+            stable_diffusion::StableDiffusionConfig::v1_5(sliced_attention_size, height, width)
         }
         StableDiffusionVersion::V2_1 => {
-            stable_diffusion::StableDiffusionConfig::v2_1(sliced_attention_size)
+            stable_diffusion::StableDiffusionConfig::v2_1(sliced_attention_size, height, width)
         }
     };
+
     let device_setup = diffusers::utils::DeviceSetup::new(cpu);
     let clip_device = device_setup.get("clip");
     let vae_device = device_setup.get("vae");

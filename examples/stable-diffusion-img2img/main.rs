@@ -154,10 +154,10 @@ fn run(args: Args) -> anyhow::Result<()> {
     println!("Cudnn available: {}", tch::Cuda::cudnn_is_available());
     let sd_config = match sd_version {
         StableDiffusionVersion::V1_5 => {
-            stable_diffusion::StableDiffusionConfig::v1_5(sliced_attention_size)
+            stable_diffusion::StableDiffusionConfig::v1_5(sliced_attention_size, None, None)
         }
         StableDiffusionVersion::V2_1 => {
-            stable_diffusion::StableDiffusionConfig::v2_1(sliced_attention_size)
+            stable_diffusion::StableDiffusionConfig::v2_1(sliced_attention_size, None, None)
         }
     };
 

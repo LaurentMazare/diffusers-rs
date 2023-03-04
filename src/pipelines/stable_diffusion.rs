@@ -15,7 +15,11 @@ pub struct StableDiffusionConfig {
 }
 
 impl StableDiffusionConfig {
-    pub fn v1_5(sliced_attention_size: Option<i64>) -> Self {
+    pub fn v1_5(
+        sliced_attention_size: Option<i64>,
+        height: Option<i64>,
+        width: Option<i64>,
+    ) -> Self {
         let bc = |out_channels, use_cross_attn, attention_head_dim| unet_2d::BlockConfig {
             out_channels,
             use_cross_attn,
@@ -42,9 +46,23 @@ impl StableDiffusionConfig {
             latent_channels: 4,
             norm_num_groups: 32,
         };
+        let height = if let Some(height) = height {
+            assert_eq!(height % 8, 0, "heigh has to be divisible by 8");
+            height
+        } else {
+            512
+        };
+
+        let width = if let Some(width) = width {
+            assert_eq!(width % 8, 0, "width has to be divisible by 8");
+            width
+        } else {
+            512
+        };
+
         Self {
-            width: 512,
-            height: 512,
+            width,
+            height,
             clip: clip::Config::v1_5(),
             autoencoder,
             scheduler: Default::default(),
@@ -52,7 +70,11 @@ impl StableDiffusionConfig {
         }
     }
 
-    pub fn v2_1(sliced_attention_size: Option<i64>) -> Self {
+    pub fn v2_1(
+        sliced_attention_size: Option<i64>,
+        height: Option<i64>,
+        width: Option<i64>,
+    ) -> Self {
         let bc = |out_channels, use_cross_attn, attention_head_dim| unet_2d::BlockConfig {
             out_channels,
             use_cross_attn,
@@ -89,7 +111,22 @@ impl StableDiffusionConfig {
             prediction_type: PredictionType::VPrediction,
             ..Default::default()
         };
-        Self { width: 768, height: 768, clip: clip::Config::v2_1(), autoencoder, scheduler, unet }
+
+        let height = if let Some(height) = height {
+            assert_eq!(height % 8, 0, "heigh has to be divisible by 8");
+            height
+        } else {
+            768
+        };
+
+        let width = if let Some(width) = width {
+            assert_eq!(width % 8, 0, "width has to be divisible by 8");
+            width
+        } else {
+            768
+        };
+
+        Self { width, height, clip: clip::Config::v2_1(), autoencoder, scheduler, unet }
     }
 
     pub fn build_vae(

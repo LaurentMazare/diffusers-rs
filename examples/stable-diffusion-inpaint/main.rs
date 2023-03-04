@@ -42,6 +42,14 @@ struct Args {
     #[arg(long)]
     cpu: Vec<String>,
 
+    /// The height in pixels of the generated image.
+    #[arg(long)]
+    height: Option<i64>,
+
+    /// The width in pixels of the generated image.
+    #[arg(long)]
+    width: Option<i64>,
+
     #[arg(long, value_name = "FILE", default_value = "data/bpe_simple_vocab_16e6.txt")]
     /// The file specifying the vocabulary to used for tokenization.
     vocab_file: String,
@@ -141,6 +149,8 @@ fn run(args: Args) -> anyhow::Result<()> {
     let Args {
         prompt,
         cpu,
+        height,
+        width,
         n_steps,
         seed,
         final_image,
@@ -157,10 +167,10 @@ fn run(args: Args) -> anyhow::Result<()> {
     println!("Cudnn available: {}", tch::Cuda::cudnn_is_available());
     let sd_config = match sd_version {
         StableDiffusionVersion::V1_5 => {
-            stable_diffusion::StableDiffusionConfig::v1_5(sliced_attention_size)
+            stable_diffusion::StableDiffusionConfig::v1_5(sliced_attention_size, height, width)
         }
         StableDiffusionVersion::V2_1 => {
-            stable_diffusion::StableDiffusionConfig::v2_1(sliced_attention_size)
+            stable_diffusion::StableDiffusionConfig::v2_1(sliced_attention_size, height, width)
         }
     };
     let (mask, masked_image) = prepare_mask_and_masked_image(input_image, mask_image)?;
