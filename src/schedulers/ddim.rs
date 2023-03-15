@@ -23,7 +23,11 @@ pub struct DDIMSchedulerConfig {
     pub eta: f64,
     /// Adjust the indexes of the inference schedule by this value.
     pub steps_offset: usize,
+    /// prediction type of the scheduler function, one of `epsilon` (predicting
+    /// the noise of the diffusion process), `sample` (directly predicting the noisy sample`)
+    /// or `v_prediction` (see section 2.4 https://imagen.research.google/video/paper.pdf)
     pub prediction_type: PredictionType,
+    /// number of diffusion steps used to train the model
     pub train_timesteps: usize,
 }
 
@@ -102,7 +106,7 @@ impl DDIMScheduler {
         let beta_prod_t = 1. - alpha_prod_t;
         let beta_prod_t_prev = 1. - alpha_prod_t_prev;
 
-        let (pred_original_sample, model_output) = match self.config.prediction_type {
+        let (pred_original_sample, pred_epsilon) = match self.config.prediction_type {
             PredictionType::Epsilon => {
                 let pred_original_sample =
                     (sample - beta_prod_t.sqrt() * model_output) / alpha_prod_t.sqrt();
@@ -111,12 +115,14 @@ impl DDIMScheduler {
             PredictionType::VPrediction => {
                 let pred_original_sample =
                     alpha_prod_t.sqrt() * sample - beta_prod_t.sqrt() * model_output;
-                let model_output = alpha_prod_t.sqrt() * model_output + beta_prod_t.sqrt() * sample;
-                (pred_original_sample, model_output)
+                let pred_epsilon = alpha_prod_t.sqrt() * model_output + beta_prod_t.sqrt() * sample;
+                (pred_original_sample, pred_epsilon)
             }
             PredictionType::Sample => {
                 let pred_original_sample = model_output.shallow_clone();
-                (pred_original_sample, model_output.shallow_clone())
+                let pred_epsilon =
+                    (sample - alpha_prod_t.sqrt() * &pred_original_sample) / beta_prod_t.sqrt();
+                (pred_original_sample, pred_epsilon)
             }
         };
 
@@ -124,7 +130,7 @@ impl DDIMScheduler {
         let std_dev_t = self.config.eta * variance.sqrt();
 
         let pred_sample_direction =
-            (1. - alpha_prod_t_prev - std_dev_t * std_dev_t).sqrt() * model_output;
+            (1. - alpha_prod_t_prev - std_dev_t * std_dev_t).sqrt() * pred_epsilon;
         let prev_sample = alpha_prod_t_prev.sqrt() * pred_original_sample + pred_sample_direction;
         if self.config.eta > 0. {
             &prev_sample + Tensor::randn_like(&prev_sample) * std_dev_t
@@ -133,9 +139,8 @@ impl DDIMScheduler {
         }
     }
 
-    pub fn add_noise(&self, original: &Tensor, timestep: usize) -> Tensor {
+    pub fn add_noise(&self, original: &Tensor, noise: Tensor, timestep: usize) -> Tensor {
         let timestep = if timestep >= self.alphas_cumprod.len() { timestep - 1 } else { timestep };
-        let noise = original.randn_like();
         let sqrt_alpha_prod = self.alphas_cumprod[timestep].sqrt();
         let sqrt_one_minus_alpha_prod = (1.0 - self.alphas_cumprod[timestep]).sqrt();
         sqrt_alpha_prod * original + sqrt_one_minus_alpha_prod * noise
