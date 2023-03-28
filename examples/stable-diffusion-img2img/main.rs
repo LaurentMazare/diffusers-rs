@@ -154,10 +154,10 @@ fn run(args: Args) -> anyhow::Result<()> {
     println!("Cudnn available: {}", tch::Cuda::cudnn_is_available());
     let sd_config = match sd_version {
         StableDiffusionVersion::V1_5 => {
-            stable_diffusion::StableDiffusionConfig::v1_5(sliced_attention_size)
+            stable_diffusion::StableDiffusionConfig::v1_5(sliced_attention_size, None, None)
         }
         StableDiffusionVersion::V2_1 => {
-            stable_diffusion::StableDiffusionConfig::v2_1(sliced_attention_size)
+            stable_diffusion::StableDiffusionConfig::v2_1(sliced_attention_size, None, None)
         }
     };
 
@@ -200,7 +200,8 @@ fn run(args: Args) -> anyhow::Result<()> {
         tch::manual_seed(seed + idx);
         let latents = (init_latent_dist.sample() * 0.18215).to(unet_device);
         let timesteps = scheduler.timesteps();
-        let mut latents = scheduler.add_noise(&latents, timesteps[t_start]);
+        let noise = latents.randn_like();
+        let mut latents = scheduler.add_noise(&latents, noise, timesteps[t_start]);
 
         for (timestep_index, &timestep) in timesteps.iter().enumerate() {
             if timestep_index < t_start {
