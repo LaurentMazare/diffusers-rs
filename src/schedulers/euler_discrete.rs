@@ -79,9 +79,14 @@ impl EulerDiscreteScheduler {
         let sigmas = Tensor::concat(&[sigmas, Tensor::of_slice(&[0.0])], 0);
 
         // standard deviation of the initial noise distribution
-        let init_noise_sigma: f64 = sigmas.max().into();
+        let init_noise_sigma: f64 = sigmas.max().try_into().unwrap();
 
-        Self { timesteps: timesteps.into(), sigmas: sigmas.into(), init_noise_sigma, config }
+        Self {
+            timesteps: timesteps.try_into().unwrap(),
+            sigmas: sigmas.try_into().unwrap(),
+            init_noise_sigma,
+            config,
+        }
     }
 
     pub fn timesteps(&self) -> &[f64] {

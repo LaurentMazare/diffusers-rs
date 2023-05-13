@@ -275,7 +275,7 @@ fn run(args: Args) -> anyhow::Result<()> {
     for idx in 0..num_samples {
         tch::manual_seed(seed + idx);
         let mut latents = Tensor::randn(
-            &[bsize, 4, sd_config.height / 8, sd_config.width / 8],
+            [bsize, 4, sd_config.height / 8, sd_config.width / 8],
             (Kind::Float, unet_device),
         );
 

@@ -81,7 +81,7 @@ impl DDIMScheduler {
             BetaSchedule::SquaredcosCapV2 => betas_for_alpha_bar(config.train_timesteps, 0.999),
         };
         let alphas: Tensor = 1.0 - betas;
-        let alphas_cumprod = Vec::<f64>::from(alphas.cumprod(0, Kind::Double));
+        let alphas_cumprod = Vec::<f64>::try_from(alphas.cumprod(0, Kind::Double)).unwrap();
         Self { alphas_cumprod, timesteps, step_ratio, init_noise_sigma: 1., config }
     }
 

@@ -78,7 +78,7 @@ impl DDPMScheduler {
 
         // &betas to avoid moving it
         let alphas: Tensor = 1. - betas;
-        let alphas_cumprod = Vec::<f64>::from(alphas.cumprod(0, Kind::Double));
+        let alphas_cumprod = Vec::<f64>::try_from(alphas.cumprod(0, Kind::Double)).unwrap();
 
         // min(train_timesteps, inference_steps)
         // https://github.com/huggingface/diffusers/blob/8331da46837be40f96fbd24de6a6fb2da28acd11/src/diffusers/schedulers/scheduling_ddpm.py#L187

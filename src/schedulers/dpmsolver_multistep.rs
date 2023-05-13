@@ -128,10 +128,10 @@ impl DPMSolverMultistepScheduler {
         let model_outputs = iter::repeat_with(Tensor::new).take(config.solver_order).collect();
 
         Self {
-            alphas_cumprod: alphas_cumprod.into(),
-            alpha_t: alpha_t.into(),
-            sigma_t: sigma_t.into(),
-            lambda_t: lambda_t.into(),
+            alphas_cumprod: alphas_cumprod.try_into().unwrap(),
+            alpha_t: alpha_t.try_into().unwrap(),
+            sigma_t: sigma_t.try_into().unwrap(),
+            lambda_t: lambda_t.try_into().unwrap(),
             init_noise_sigma: 1.,
             lower_order_nums: 0,
             model_outputs,

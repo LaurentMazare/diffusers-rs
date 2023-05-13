@@ -88,7 +88,7 @@ impl HeunDiscreteScheduler {
             0,
         );
 
-        let init_noise_sigma: f64 = sigmas.max().into();
+        let init_noise_sigma: f64 = sigmas.max().try_into().unwrap();
 
         // https://github.com/huggingface/diffusers/blob/aba2a65d6ab47c0d1c12fa47e9b238c1d3e34512/src/diffusers/schedulers/scheduling_heun_discrete.py#L140
         let timesteps = Tensor::cat(
@@ -102,8 +102,8 @@ impl HeunDiscreteScheduler {
         );
 
         Self {
-            timesteps: timesteps.into(),
-            sigmas: sigmas.into(),
+            timesteps: timesteps.try_into().unwrap(),
+            sigmas: sigmas.try_into().unwrap(),
             prev_derivative: None,
             dt: None,
             sample: None,

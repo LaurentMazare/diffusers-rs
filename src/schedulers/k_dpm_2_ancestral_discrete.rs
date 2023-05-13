@@ -174,14 +174,14 @@ impl KDPM2AncestralDiscreteScheduler {
         );
 
         // standard deviation of the initial noise distribution
-        let init_noise_sigma: f64 = sigmas.max().into();
+        let init_noise_sigma: f64 = sigmas.max().try_into().unwrap();
 
         Self {
-            timesteps: timesteps.into(),
-            sigmas: sigmas.into(),
-            sigmas_interpol: sigmas_interpol.into(),
-            sigmas_up: sigmas_up.into(),
-            sigmas_down: sigmas_down.into(),
+            timesteps: timesteps.try_into().unwrap(),
+            sigmas: sigmas.try_into().unwrap(),
+            sigmas_interpol: sigmas_interpol.try_into().unwrap(),
+            sigmas_up: sigmas_up.try_into().unwrap(),
+            sigmas_down: sigmas_down.try_into().unwrap(),
             init_noise_sigma,
             sample: None,
             config,

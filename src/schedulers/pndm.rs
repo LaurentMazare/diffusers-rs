@@ -72,7 +72,7 @@ impl PNDMScheduler {
 
         // &betas to avoid moving it
         let alphas: Tensor = 1. - betas;
-        let alphas_cumprod = Vec::<f64>::from(alphas.cumprod(0, Kind::Double));
+        let alphas_cumprod = Vec::<f64>::try_from(alphas.cumprod(0, Kind::Double)).unwrap();
 
         let final_alpha_cumprod = if config.set_alpha_to_one { 1.0 } else { alphas_cumprod[0] };
         // creates integer timesteps by multiplying by ratio

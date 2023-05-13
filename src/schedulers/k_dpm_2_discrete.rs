@@ -98,7 +98,7 @@ impl KDPM2DiscreteScheduler {
             0,
         );
 
-        let init_noise_sigma: f64 = sigmas.max().into();
+        let init_noise_sigma: f64 = sigmas.max().try_into().unwrap();
 
         // interpolate timesteps
         let timesteps_interpol = Self::sigma_to_t(&sigmas_interpol, log_sigmas);
@@ -136,9 +136,9 @@ impl KDPM2DiscreteScheduler {
         );
 
         Self {
-            timesteps: timesteps.into(),
-            sigmas: sigmas.into(),
-            sigmas_interpol: sigmas_interpol.into(),
+            timesteps: timesteps.try_into().unwrap(),
+            sigmas: sigmas.try_into().unwrap(),
+            sigmas_interpol: sigmas_interpol.try_into().unwrap(),
             init_noise_sigma,
             sample: None,
             config,

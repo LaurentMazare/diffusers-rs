@@ -203,7 +203,7 @@ fn run(args: Args) -> anyhow::Result<()> {
     println!("Building the unet.");
     let unet = sd_config.build_unet(&unet_weights, unet_device, 9)?;
 
-    let mask = mask.upsample_nearest2d(&[sd_config.height / 8, sd_config.width / 8], None, None);
+    let mask = mask.upsample_nearest2d([sd_config.height / 8, sd_config.width / 8], None, None);
     let mask = Tensor::cat(&[&mask, &mask], 0).to_device(unet_device);
     let masked_image_dist = vae.encode(&masked_image.to_device(vae_device));
 
@@ -213,7 +213,7 @@ fn run(args: Args) -> anyhow::Result<()> {
         let masked_image_latents = (masked_image_dist.sample() * 0.18215).to(unet_device);
         let masked_image_latents = Tensor::cat(&[&masked_image_latents, &masked_image_latents], 0);
         let mut latents = Tensor::randn(
-            &[bsize, 4, sd_config.height / 8, sd_config.width / 8],
+            [bsize, 4, sd_config.height / 8, sd_config.width / 8],
             (Kind::Float, unet_device),
         );
 
