@@ -516,7 +516,7 @@ impl ClipTextEmbeddings {
         );
         let position_ids =
             Tensor::arange(c.max_position_embeddings as i64, (Kind::Int64, vs.device()))
-                .expand(&[1, -1], false);
+                .expand([1, -1], false);
         ClipTextEmbeddings { token_embedding, position_embedding, position_ids }
     }
 }
@@ -578,7 +578,7 @@ impl ClipAttention {
         attn_output
             .view((bsz, self.num_attention_heads, tgt_len, self.head_dim))
             .transpose(1, 2)
-            .reshape(&[bsz, tgt_len, embed_dim])
+            .reshape([bsz, tgt_len, embed_dim])
             .apply(&self.out_proj)
     }
 }
@@ -682,7 +682,7 @@ impl ClipTextTransformer {
 
     // https://github.com/huggingface/transformers/blob/674f750a57431222fa2832503a108df3badf1564/src/transformers/models/clip/modeling_clip.py#L678
     fn build_causal_attention_mask(bsz: i64, seq_len: i64, device: Device) -> Tensor {
-        let mut mask = Tensor::ones(&[bsz, seq_len, seq_len], (Kind::Float, device));
+        let mut mask = Tensor::ones([bsz, seq_len, seq_len], (Kind::Float, device));
         mask.fill_(f32::MIN as f64).triu_(1).unsqueeze(1)
     }
 }

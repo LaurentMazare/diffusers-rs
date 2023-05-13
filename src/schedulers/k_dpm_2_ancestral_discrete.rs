@@ -86,7 +86,7 @@ impl KDPM2AncestralDiscreteScheduler {
         let sz = sigmas.size1().unwrap();
 
         // compute up and down sigmas
-        let sigmas_next = sigmas.roll(&[-1], &[0]);
+        let sigmas_next = sigmas.roll([-1], [0]);
         // sigmas_next[-1] = 0.0
         let sigmas_next = sigmas_next.index_fill(0, &[sz - 1].as_slice().into(), 0.0);
         let sigmas_up = (sigmas_next.square() * (sigmas.square() - sigmas_next.square())

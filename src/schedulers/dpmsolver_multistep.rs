@@ -172,7 +172,7 @@ impl DPMSolverMultistepScheduler {
                 if self.config.thresholding {
                     // Dynamic thresholding in https://arxiv.org/abs/2205.11487
                     let dynamic_max_val =
-                        x0_pred.abs().reshape(&[x0_pred.size()[0], -1]).quantile_scalar(
+                        x0_pred.abs().reshape([x0_pred.size()[0], -1]).quantile_scalar(
                             self.config.dynamic_thresholding_ratio,
                             1,
                             false,

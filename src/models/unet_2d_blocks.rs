@@ -34,10 +34,10 @@ impl Downsample2D {
 impl Module for Downsample2D {
     fn forward(&self, xs: &Tensor) -> Tensor {
         match &self.conv {
-            None => xs.avg_pool2d(&[2, 2], &[2, 2], &[0, 0], false, true, None),
+            None => xs.avg_pool2d([2, 2], [2, 2], [0, 0], false, true, None),
             Some(conv) => {
                 if self.padding == 0 {
-                    xs.pad(&[0, 1, 0, 1], "constant", Some(0.)).apply(conv)
+                    xs.pad([0, 1, 0, 1], "constant", Some(0.)).apply(conv)
                 } else {
                     xs.apply(conv)
                 }
@@ -68,9 +68,9 @@ impl Upsample2D {
                 // dimensions so hack our way around this.
                 // xs.upsample_nearest2d(&[], Some(2.), Some(2.)
                 let (_bsize, _channels, h, w) = xs.size4().unwrap();
-                xs.upsample_nearest2d(&[2 * h, 2 * w], Some(2.), Some(2.))
+                xs.upsample_nearest2d([2 * h, 2 * w], Some(2.), Some(2.))
             }
-            Some((h, w)) => xs.upsample_nearest2d(&[h, w], None, None),
+            Some((h, w)) => xs.upsample_nearest2d([h, w], None, None),
         };
         xs.apply(&self.conv)
     }

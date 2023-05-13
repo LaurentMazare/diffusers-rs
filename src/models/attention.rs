@@ -81,16 +81,16 @@ impl CrossAttention {
 
     fn reshape_heads_to_batch_dim(&self, xs: &Tensor) -> Tensor {
         let (batch_size, seq_len, dim) = xs.size3().unwrap();
-        xs.reshape(&[batch_size, seq_len, self.heads, dim / self.heads])
-            .permute(&[0, 2, 1, 3])
-            .reshape(&[batch_size * self.heads, seq_len, dim / self.heads])
+        xs.reshape([batch_size, seq_len, self.heads, dim / self.heads])
+            .permute([0, 2, 1, 3])
+            .reshape([batch_size * self.heads, seq_len, dim / self.heads])
     }
 
     fn reshape_batch_dim_to_heads(&self, xs: &Tensor) -> Tensor {
         let (batch_size, seq_len, dim) = xs.size3().unwrap();
-        xs.reshape(&[batch_size / self.heads, self.heads, seq_len, dim])
-            .permute(&[0, 2, 1, 3])
-            .reshape(&[batch_size / self.heads, seq_len, dim * self.heads])
+        xs.reshape([batch_size / self.heads, self.heads, seq_len, dim])
+            .permute([0, 2, 1, 3])
+            .reshape([batch_size / self.heads, seq_len, dim * self.heads])
     }
 
     fn sliced_attention(
@@ -104,7 +104,7 @@ impl CrossAttention {
     ) -> Tensor {
         let batch_size_attention = query.size()[0];
         let mut hidden_states = Tensor::zeros(
-            &[batch_size_attention, sequence_length, dim / self.heads],
+            [batch_size_attention, sequence_length, dim / self.heads],
             (query.kind(), query.device()),
         );
 
@@ -284,12 +284,12 @@ impl SpatialTransformer {
             Proj::Conv2D(p) => {
                 let xs = xs.apply(p);
                 let inner_dim = xs.size()[1];
-                let xs = xs.permute(&[0, 2, 3, 1]).view((batch, height * weight, inner_dim));
+                let xs = xs.permute([0, 2, 3, 1]).view((batch, height * weight, inner_dim));
                 (inner_dim, xs)
             }
             Proj::Linear(p) => {
                 let inner_dim = xs.size()[1];
-                let xs = xs.permute(&[0, 2, 3, 1]).view((batch, height * weight, inner_dim));
+                let xs = xs.permute([0, 2, 3, 1]).view((batch, height * weight, inner_dim));
                 (inner_dim, xs.apply(p))
             }
         };
@@ -299,10 +299,10 @@ impl SpatialTransformer {
         }
         let xs = match &self.proj_out {
             Proj::Conv2D(p) => {
-                xs.view((batch, height, weight, inner_dim)).permute(&[0, 3, 1, 2]).apply(p)
+                xs.view((batch, height, weight, inner_dim)).permute([0, 3, 1, 2]).apply(p)
             }
             Proj::Linear(p) => {
-                xs.apply(p).view((batch, height, weight, inner_dim)).permute(&[0, 3, 1, 2])
+                xs.apply(p).view((batch, height, weight, inner_dim)).permute([0, 3, 1, 2])
             }
         };
         xs + residual
@@ -351,7 +351,7 @@ impl AttentionBlock {
 
     fn transpose_for_scores(&self, xs: Tensor) -> Tensor {
         let (batch, t, _h_times_d) = xs.size3().unwrap();
-        xs.view((batch, t, self.num_heads, -1)).permute(&[0, 2, 1, 3])
+        xs.view((batch, t, self.num_heads, -1)).permute([0, 2, 1, 3])
     }
 }
 
@@ -375,7 +375,7 @@ impl Module for AttentionBlock {
         let attention_probs = attention_scores.softmax(-1, Kind::Float);
 
         let xs = attention_probs.matmul(&value_states);
-        let xs = xs.permute(&[0, 2, 1, 3]).contiguous();
+        let xs = xs.permute([0, 2, 1, 3]).contiguous();
         let mut new_xs_shape = xs.size();
         new_xs_shape.pop();
         new_xs_shape.pop();

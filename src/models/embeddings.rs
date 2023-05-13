@@ -55,7 +55,7 @@ impl Module for Timesteps {
             Tensor::cat(&[emb.sin(), emb.cos()], -1)
         };
         if self.num_channels % 2 == 1 {
-            emb.pad(&[0, 1, 0, 0], "constant", None)
+            emb.pad([0, 1, 0, 0], "constant", None)
         } else {
             emb
         }

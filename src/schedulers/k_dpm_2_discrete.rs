@@ -83,7 +83,7 @@ impl KDPM2DiscreteScheduler {
         let sigmas = Tensor::concat(&[sigmas, Tensor::of_slice(&[0.0])], 0);
 
         // interpolate sigmas
-        let sigmas_interpol = sigmas.log().lerp(&sigmas.roll(&[1], &[0]).log(), 0.5).exp();
+        let sigmas_interpol = sigmas.log().lerp(&sigmas.roll([1], [0]).log(), 0.5).exp();
 
         // https://github.com/huggingface/diffusers/blob/9b37ed33b5fa09e594b38e4e6f7477beff3bd66a/src/diffusers/schedulers/scheduling_k_dpm_2_discrete.py#L145
         let sigmas = Tensor::cat(

@@ -251,7 +251,7 @@ impl UNet2DConditionModel {
         // 0. center input if necessary
         let xs = if self.config.center_input_sample { xs * 2.0 - 1.0 } else { xs.shallow_clone() };
         // 1. time
-        let emb = (Tensor::ones(&[bsize], (Kind::Float, device)) * timestep)
+        let emb = (Tensor::ones([bsize], (Kind::Float, device)) * timestep)
             .apply(&self.time_proj)
             .apply(&self.time_embedding);
         // 2. pre-process
