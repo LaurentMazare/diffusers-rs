@@ -71,7 +71,7 @@ pub fn interp(x: &Tensor, xp: Tensor, yp: Tensor) -> Tensor {
 
     // torch.sum(torch.ge(x[:, None], xp[None, :]), 1) - 1
     let indices = x.unsqueeze(-1).ge_tensor(&xp.unsqueeze(0));
-    let indices = indices.sum_dim_intlist([1].as_slice(), false, Kind::Int64) - 1;
+    let indices = indices.sum_dim_intlist(1, false, Kind::Int64) - 1;
     // torch.clamp(indices, 0, len(m) - 1)
     let indices = indices.clamp(0, m.size1().unwrap() - 1);
 
