@@ -44,7 +44,8 @@ For a GPU with 8GB, one can use the [fp16 weights for the UNet](https://huggingf
 
 ```bash
 PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.6,max_split_size_mb:128 RUST_BACKTRACE=1 CARGO_TARGET_DIR=target2 cargo run \
-    --example stable-diffusion --features clap -- --cpu vae --cpu clip --unet-weights data/unet-fp16.ot
+    --example stable-diffusion --features clap -- --cpu vae --cpu clip \
+    --unet-weights data/unet-fp16.safetensors
 ```
 
 ## Examples
@@ -74,7 +75,7 @@ be changed via the `-prompt` flag.
 
 Inpainting can be used to modify an existing image based on a prompt and modifying the part of the
 initial image specified by a mask.
-This requires different unet weights `unet-inpaint.ot` that could also be retrieved from this
+This requires different unet weights `unet-inpaint.safetensors` that could also be retrieved from this
 [repo](https://huggingface.co/lmz/rust-stable-diffusion-v1-5) and should also be
 placed in the `data/` directory.
 
@@ -99,7 +100,7 @@ The weights can be retrieved as `.ot` files from
 huggingface [v2.1](https://huggingface.co/lmz/rust-stable-diffusion-v2-1).
 or [v1.5](https://huggingface.co/lmz/rust-stable-diffusion-v1-5).
 It is also possible to download the weights for the original stable diffusion
-model and convert them to `.ot` files by following the instructions below, these
+model and convert them to `.safetensors` files by following the instructions below, these
 instructions are for version 1.5 but can easily be adapted for version 2.1
 using this [model repo](https://huggingface.co/stabilityai/stable-diffusion-2-1)
 instead.
@@ -120,19 +121,16 @@ For the clip encoding weights, start by downloading the weight file.
 wget https://huggingface.co/openai/clip-vit-large-patch14/resolve/main/pytorch_model.bin
 ```
 
-Then using Python, load the weights and save them in a `.npz` file.
+Then using Python, load the weights and save them in a `.safetensors` file.
 
 ```python
 import numpy as np
 import torch
+from safetensors.torch import save_file
+
 model = torch.load("./pytorch_model.bin")
-np.savez("./pytorch_model.npz", **{k: v.numpy() for k, v in model.items() if "text_model" in k})
-```
-
-Finally use `tensor-tools` from the `examples` directory to convert this to a `.ot` file that tch can use.
-
-```bash
-cargo run --release --example tensor-tools cp ./data/pytorch_model.npz ./data/pytorch_model.ot
+tensors = {k: v.clone().detach() for k, v in model.items() if 'text_model' in k}
+save_file(tensors, 'pytorch_model.safetensors')
 ```
 
 ### VAE and Unet Weights
@@ -142,17 +140,12 @@ The weight files can be downloaded from huggingface's hub but it first requires 
 After downloading the files, use Python to convert them to `npz` files.
 
 ```python
-import numpy as np
 import torch
-model = torch.load("./vae.bin")
-np.savez("./vae.npz", **{k: v.numpy() for k, v in model.items()})
-model = torch.load("./unet.bin")
-np.savez("./unet.npz", **{k: v.numpy() for k, v in model.items()})
-```
-
-And again convert this to a `.ot` file via `tensor-tools`.
-
-```bash
-cargo run --release --example tensor-tools cp ./data/vae.npz ./data/vae.ot
-cargo run --release --example tensor-tools cp ./data/unet.npz ./data/unet.ot
+from safetensors.torch import save_file
+  
+model = torch.load('./vae.bin')
+save_file(dict(model), './vae.safetensors')
+  
+model = torch.load('./unet.bin')
+save_file(dict(model), './unet.safetensors')
 ```
