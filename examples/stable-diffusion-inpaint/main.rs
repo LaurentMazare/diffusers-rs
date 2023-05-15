@@ -169,9 +169,11 @@ fn run(args: Args) -> anyhow::Result<()> {
         StableDiffusionVersion::V1_5 => {
             stable_diffusion::StableDiffusionConfig::v1_5(sliced_attention_size, height, width)
         }
-        StableDiffusionVersion::V2_1 => {
-            stable_diffusion::StableDiffusionConfig::v2_1(sliced_attention_size, height, width)
-        }
+        StableDiffusionVersion::V2_1 => stable_diffusion::StableDiffusionConfig::v2_1_inpaint(
+            sliced_attention_size,
+            height,
+            width,
+        ),
     };
     let (mask, masked_image) = prepare_mask_and_masked_image(input_image, mask_image)?;
     println!("Loaded input image and mask, {:?} {:?}.", masked_image.size(), mask.size());

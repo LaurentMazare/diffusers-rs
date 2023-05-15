@@ -70,10 +70,11 @@ impl StableDiffusionConfig {
         }
     }
 
-    pub fn v2_1(
+    fn v2_1_(
         sliced_attention_size: Option<i64>,
         height: Option<i64>,
         width: Option<i64>,
+        prediction_type: PredictionType,
     ) -> Self {
         let bc = |out_channels, use_cross_attn, attention_head_dim| unet_2d::BlockConfig {
             out_channels,
@@ -107,10 +108,7 @@ impl StableDiffusionConfig {
             latent_channels: 4,
             norm_num_groups: 32,
         };
-        let scheduler = ddim::DDIMSchedulerConfig {
-            prediction_type: PredictionType::VPrediction,
-            ..Default::default()
-        };
+        let scheduler = ddim::DDIMSchedulerConfig { prediction_type, ..Default::default() };
 
         let height = if let Some(height) = height {
             assert_eq!(height % 8, 0, "heigh has to be divisible by 8");
@@ -127,6 +125,26 @@ impl StableDiffusionConfig {
         };
 
         Self { width, height, clip: clip::Config::v2_1(), autoencoder, scheduler, unet }
+    }
+
+    pub fn v2_1(
+        sliced_attention_size: Option<i64>,
+        height: Option<i64>,
+        width: Option<i64>,
+    ) -> Self {
+        // https://huggingface.co/stabilityai/stable-diffusion-2-1/blob/main/scheduler/scheduler_config.json
+        Self::v2_1_(sliced_attention_size, height, width, PredictionType::VPrediction)
+    }
+
+    pub fn v2_1_inpaint(
+        sliced_attention_size: Option<i64>,
+        height: Option<i64>,
+        width: Option<i64>,
+    ) -> Self {
+        // https://huggingface.co/stabilityai/stable-diffusion-2-inpainting/blob/main/scheduler/scheduler_config.json
+        // This uses a PNDM scheduler rather than DDIM but the biggest difference is the prediction
+        // type being "epsilon" by default and not "v_prediction".
+        Self::v2_1_(sliced_attention_size, height, width, PredictionType::Epsilon)
     }
 
     pub fn build_vae(
