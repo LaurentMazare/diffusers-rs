@@ -21,7 +21,7 @@ anyhow = "1"
 thiserror = "1"
 regex = "1.6.0"
 tch = "0.13"
-torch-sys = "0.13"
+torch-sys = { version = "0.13", features = ["download-libtorch"] }
 
 clap = { version = "4.0.19", optional = true, features = ["derive"] }
 
