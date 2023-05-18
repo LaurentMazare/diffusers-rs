@@ -14,11 +14,12 @@ wget_vocab() {
 wget_clip_weights() {
   wget -c https://huggingface.co/openai/clip-vit-large-patch14/resolve/main/pytorch_model.bin
   LD_LIBRARY_PATH= python3 -c "
-import numpy as np
 import torch
+from safetensors.torch import save_file
 
 model = torch.load('./pytorch_model.bin')
-np.savez('./pytorch_model.npz', **{k: v.numpy() for k, v in model.items() if 'text_model' in k})
+tensors = {k: v.clone().detach() for k, v in model.items() if 'text_model' in k}
+save_file(tensors, 'pytorch_model.safetensors')
 "
 }
 
@@ -31,21 +32,16 @@ wget_vae_unet_weights() {
   
   # convert to npz
   LD_LIBRARY_PATH= python3 -c "
-import numpy as np
 import torch
+from safetensors.torch import save_file
   
 model = torch.load('./vae.bin')
-np.savez('./vae.npz', **{k: v.numpy() for k, v in model.items()})
+save_file(dict(model), './vae.safetensors')
   
 model = torch.load('./unet.bin')
-np.savez('./unet.npz', **{k: v.numpy() for k, v in model.items()})
+save_file(dict(model), './unet.safetensors')
 "
 }
-
-tch_tools_to_ot() {
-  cargo run --release --example tensor-tools cp $ROOT/data/$1.npz $ROOT/data/$1.ot
-}
-
 
 if [ $# -ne 1 ]; then
     echo 'Usage: ./download_weights.sh <HUGGINGFACE_TOKEN>' >&2
@@ -63,13 +59,7 @@ wget_vocab
 wget_clip_weights 
 wget_vae_unet_weights $1 
 
-echo "Converting the Weights..."
-# convert the weights 
-tch_tools_to_ot pytorch_model 
-tch_tools_to_ot vae 
-tch_tools_to_ot unet 
-
 echo "Cleaning ..."
-rm -rf $ROOT/data/*.npz $ROOT/data/*.bin
+rm -rf $ROOT/data/*.bin
 
 echo "Done."

@@ -54,15 +54,15 @@ struct Args {
     /// The file specifying the vocabulary to used for tokenization.
     vocab_file: String,
 
-    /// The UNet weight file, in .ot format.
+    /// The UNet weight file, in .ot or .safetensors format.
     #[arg(long, value_name = "FILE")]
     unet_weights: Option<String>,
 
-    /// The CLIP weight file, in .ot format.
+    /// The CLIP weight file, in .ot or .safetensors format.
     #[arg(long, value_name = "FILE")]
     clip_weights: Option<String>,
 
-    /// The VAE weight file, in .ot format.
+    /// The VAE weight file, in .ot or .safetensors format.
     #[arg(long, value_name = "FILE")]
     vae_weights: Option<String>,
 
@@ -101,8 +101,8 @@ impl Args {
         match &self.clip_weights {
             Some(w) => w.clone(),
             None => match self.sd_version {
-                StableDiffusionVersion::V1_5 => "data/pytorch_model.ot".to_string(),
-                StableDiffusionVersion::V2_1 => "data/clip_v2.1.ot".to_string(),
+                StableDiffusionVersion::V1_5 => "data/pytorch_model.safetensors".to_string(),
+                StableDiffusionVersion::V2_1 => "data/clip_v2.1.safetensors".to_string(),
             },
         }
     }
@@ -111,8 +111,8 @@ impl Args {
         match &self.vae_weights {
             Some(w) => w.clone(),
             None => match self.sd_version {
-                StableDiffusionVersion::V1_5 => "data/vae.ot".to_string(),
-                StableDiffusionVersion::V2_1 => "data/vae_v2.1.ot".to_string(),
+                StableDiffusionVersion::V1_5 => "data/vae.safetensors".to_string(),
+                StableDiffusionVersion::V2_1 => "data/vae_v2.1.safetensors".to_string(),
             },
         }
     }
@@ -121,8 +121,8 @@ impl Args {
         match &self.unet_weights {
             Some(w) => w.clone(),
             None => match self.sd_version {
-                StableDiffusionVersion::V1_5 => "data/unet-inpaint.ot".to_string(),
-                StableDiffusionVersion::V2_1 => "data/unet-inpaint_v2.1.ot".to_string(),
+                StableDiffusionVersion::V1_5 => "data/unet-inpaint.safetensors".to_string(),
+                StableDiffusionVersion::V2_1 => "data/unet-inpaint_v2.1.safetensors".to_string(),
             },
         }
     }

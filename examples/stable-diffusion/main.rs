@@ -18,56 +18,44 @@
 // 1. Clip Encoding Weights
 // wget https://huggingface.co/stabilityai/stable-diffusion-2-1/resolve/fp16/text_encoder/pytorch_model.bin -O clip.bin
 // From python, extract the weights and save them as a .npz file.
-//   import numpy as np
 //   import torch
-//   model = torch.load("./clip.bin")
-//   np.savez("./clip_v2.1.npz", **{k: v.numpy() for k, v in model.items() if "text_model" in k})
+//   from safetensors.torch import save_file
 //
-// Then use tensor-tools from the tch-rs repo to convert this to a .ot file that tch can use.
-// In the tch-rs repo (https://github.com/LaurentMazare/tch-rs):
-//   cargo run --release --example tensor-tools cp ./data/clip_v2.1.npz ./data/clip_v2.1.ot
+//   model = torch.load("./clip.bin")
+//   save_file("./clip_v2.1.safetensors", **{k: v.numpy() for k, v in model.items() if "text_model" in k})
 //
 // 2. VAE and Unet Weights
 // wget https://huggingface.co/stabilityai/stable-diffusion-2-1/resolve/fp16/vae/diffusion_pytorch_model.bin -O vae.bin
 // wget https://huggingface.co/stabilityai/stable-diffusion-2-1/resolve/fp16/unet/diffusion_pytorch_model.bin -O unet.bin
 //
-//   import numpy as np
 //   import torch
+//   from safetensors.torch import save_file
 //   model = torch.load("./vae.bin")
-//   np.savez("./vae_v2.1.npz", **{k: v.numpy() for k, v in model.items()})
+//   save_file(dict(model), './vae.safetensors')
 //   model = torch.load("./unet.bin")
-//   np.savez("./unet_v2.1.npz", **{k: v.numpy() for k, v in model.items()})
-//
-//   cargo run --release --example tensor-tools cp ./data/vae_v2.1.npz ./data/vae_v2.1.ot
-//   cargo run --release --example tensor-tools cp ./data/unet_v2.1.npz ./data/unet_v2.1.ot
+//   save_file(dict(model), './unet.safetensors')
 //
 // # How to get the weights for Stable Diffusion 1.5.
 //
 // 1. Clip Encoding Weights
 // wget https://huggingface.co/openai/clip-vit-large-patch14/resolve/main/pytorch_model.bin
 // From python, extract the weights and save them as a .npz file.
-//   import numpy as np
 //   import torch
-//   model = torch.load("./pytorch_model.bin")
-//   np.savez("./pytorch_model.npz", **{k: v.numpy() for k, v in model.items() if "text_model" in k})
+//   from safetensors.torch import save_file
 //
-// Then use tensor-tools from the tch-rs repo to convert this to a .ot file that tch can use.
-// In the tch-rs repo (https://github.com/LaurentMazare/tch-rs):
-//   cargo run --release --example tensor-tools cp ./data/pytorch_model.npz ./data/pytorch_model.ot
+//   model = torch.load("./pytorch_model.bin")
+//   save_file("./pytorch_model.safetensors", **{k: v.numpy() for k, v in model.items() if "text_model" in k})
 //
 // 2. VAE and Unet Weights
 // https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/vae/diffusion_pytorch_model.bin
 // https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/unet/diffusion_pytorch_model.bin
 //
-//   import numpy as np
 //   import torch
+//   from safetensors.torch import save_file
 //   model = torch.load("./vae.bin")
-//   np.savez("./vae.npz", **{k: v.numpy() for k, v in model.items()})
+//   save_file(dict(model), './vae.safetensors')
 //   model = torch.load("./unet.bin")
-//   np.savez("./unet.npz", **{k: v.numpy() for k, v in model.items()})
-//
-//   cargo run --release --example tensor-tools cp ./data/vae.npz ./data/vae.ot
-//   cargo run --release --example tensor-tools cp ./data/unet.npz ./data/unet.ot
+//   save_file(dict(model), './unet.safetensors')
 use clap::Parser;
 use diffusers::pipelines::stable_diffusion;
 use diffusers::transformers::clip;
@@ -98,15 +86,15 @@ struct Args {
     #[arg(long)]
     width: Option<i64>,
 
-    /// The UNet weight file, in .ot format.
+    /// The UNet weight file, in .ot or .safetensors format.
     #[arg(long, value_name = "FILE")]
     unet_weights: Option<String>,
 
-    /// The CLIP weight file, in .ot format.
+    /// The CLIP weight file, in .ot or .safetensors format.
     #[arg(long, value_name = "FILE")]
     clip_weights: Option<String>,
 
-    /// The VAE weight file, in .ot format.
+    /// The VAE weight file, in .ot or .safetensors format.
     #[arg(long, value_name = "FILE")]
     vae_weights: Option<String>,
 
@@ -157,8 +145,8 @@ impl Args {
         match &self.clip_weights {
             Some(w) => w.clone(),
             None => match self.sd_version {
-                StableDiffusionVersion::V1_5 => "data/pytorch_model.ot".to_string(),
-                StableDiffusionVersion::V2_1 => "data/clip_v2.1.ot".to_string(),
+                StableDiffusionVersion::V1_5 => "data/pytorch_model.safetensors".to_string(),
+                StableDiffusionVersion::V2_1 => "data/clip_v2.1.safetensors".to_string(),
             },
         }
     }
@@ -167,8 +155,8 @@ impl Args {
         match &self.vae_weights {
             Some(w) => w.clone(),
             None => match self.sd_version {
-                StableDiffusionVersion::V1_5 => "data/vae.ot".to_string(),
-                StableDiffusionVersion::V2_1 => "data/vae_v2.1.ot".to_string(),
+                StableDiffusionVersion::V1_5 => "data/vae.safetensors".to_string(),
+                StableDiffusionVersion::V2_1 => "data/vae_v2.1.safetensors".to_string(),
             },
         }
     }
@@ -177,8 +165,8 @@ impl Args {
         match &self.unet_weights {
             Some(w) => w.clone(),
             None => match self.sd_version {
-                StableDiffusionVersion::V1_5 => "data/unet.ot".to_string(),
-                StableDiffusionVersion::V2_1 => "data/unet_v2.1.ot".to_string(),
+                StableDiffusionVersion::V1_5 => "data/unet.safetensors".to_string(),
+                StableDiffusionVersion::V2_1 => "data/unet_v2.1.safetensors".to_string(),
             },
         }
     }
