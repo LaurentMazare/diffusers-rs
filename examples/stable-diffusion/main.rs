@@ -241,10 +241,10 @@ fn run(args: Args) -> anyhow::Result<()> {
     println!("Running with prompt \"{prompt}\".");
     let tokens = tokenizer.encode(&prompt)?;
     let tokens: Vec<i64> = tokens.into_iter().map(|x| x as i64).collect();
-    let tokens = Tensor::of_slice(&tokens).view((1, -1)).to(clip_device);
+    let tokens = Tensor::from_slice(&tokens).view((1, -1)).to(clip_device);
     let uncond_tokens = tokenizer.encode("")?;
     let uncond_tokens: Vec<i64> = uncond_tokens.into_iter().map(|x| x as i64).collect();
-    let uncond_tokens = Tensor::of_slice(&uncond_tokens).view((1, -1)).to(clip_device);
+    let uncond_tokens = Tensor::from_slice(&uncond_tokens).view((1, -1)).to(clip_device);
 
     let no_grad_guard = tch::no_grad_guard();
 

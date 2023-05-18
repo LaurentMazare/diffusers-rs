@@ -80,7 +80,7 @@ impl KDPM2DiscreteScheduler {
             sigmas,
         );
         // append 0.0
-        let sigmas = Tensor::concat(&[sigmas, Tensor::of_slice(&[0.0])], 0);
+        let sigmas = Tensor::concat(&[sigmas, Tensor::from_slice(&[0.0])], 0);
 
         // interpolate sigmas
         let sigmas_interpol = sigmas.log().lerp(&sigmas.roll([1], [0]).log(), 0.5).exp();

@@ -76,7 +76,7 @@ impl EulerDiscreteScheduler {
             Tensor::range(0, sigmas.size1().unwrap() - 1, kind::FLOAT_CPU),
             sigmas,
         );
-        let sigmas = Tensor::concat(&[sigmas, Tensor::of_slice(&[0.0])], 0);
+        let sigmas = Tensor::concat(&[sigmas, Tensor::from_slice(&[0.0])], 0);
 
         // standard deviation of the initial noise distribution
         let init_noise_sigma: f64 = sigmas.max().try_into().unwrap();

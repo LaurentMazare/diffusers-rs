@@ -1,6 +1,6 @@
 [package]
 name = "diffusers"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["Laurent Mazare <lmazare@gmail.com>"]
 edition = "2021"
 build = "build.rs"
@@ -20,8 +20,8 @@ exclude = [
 anyhow = "1"
 thiserror = "1"
 regex = "1.6.0"
-tch = "0.12"
-torch-sys = "0.12"
+tch = "0.13"
+torch-sys = "0.13"
 
 clap = { version = "4.0.19", optional = true, features = ["derive"] }
 

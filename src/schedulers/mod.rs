@@ -51,8 +51,7 @@ pub(crate) fn betas_for_alpha_bar(num_diffusion_timesteps: usize, max_beta: f64)
         let t2 = (i + 1) / num_diffusion_timesteps;
         betas.push((1.0 - alpha_bar(t2) / alpha_bar(t1)).min(max_beta));
     }
-
-    Tensor::of_slice(&betas)
+    Tensor::from_slice(&betas)
 }
 
 /// One-dimensional linear interpolation for monotonically increasing sample

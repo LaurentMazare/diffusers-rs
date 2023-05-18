@@ -83,7 +83,7 @@ impl HeunDiscreteScheduler {
                 // sigmas[1:].repeat_interleave(2)
                 sigmas.i(1..).repeat_interleave_self_int(2, 0, None),
                 // append 0.0
-                Tensor::of_slice(&[0.0]),
+                Tensor::from_slice(&[0.0]),
             ],
             0,
         );
