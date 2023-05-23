@@ -96,12 +96,15 @@ be changed via the `-prompt` flag.
 
 ## Converting the Original Weight Files
 
-The weights can be retrieved as `.ot` files from
+The weights can be retrieved as `.safetensors` or `.ot` files from
 huggingface [v2.1](https://huggingface.co/lmz/rust-stable-diffusion-v2-1).
-or [v1.5](https://huggingface.co/lmz/rust-stable-diffusion-v1-5).
+or [v1.5](https://huggingface.co/lmz/rust-stable-diffusion-v1-5). It is recommended
+to use the `.safetensors` versions.
+
 It is also possible to download the weights for the original stable diffusion
-model and convert them to `.safetensors` files by following the instructions below, these
-instructions are for version 1.5 but can easily be adapted for version 2.1
+model and convert them to `.safetensors` files by following the instructions below
+or use the download scripts from the `scripts/` directiory.
+These instructions are for version 1.5 but can easily be adapted for version 2.1
 using this [model repo](https://huggingface.co/stabilityai/stable-diffusion-2-1)
 instead.
 

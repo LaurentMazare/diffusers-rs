@@ -44,7 +44,7 @@ save_file(dict(model), './unet.safetensors')
 }
 
 if [ $# -ne 1 ]; then
-    echo 'Usage: ./download_weights.sh <HUGGINGFACE_TOKEN>' >&2
+    echo 'Usage: ./download_weights_1.5.sh <HUGGINGFACE_TOKEN>' >&2
     exit 1
 fi
 
