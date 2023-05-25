@@ -17,13 +17,13 @@ def ensure_data_dir():
         print("Found data directory")
 
     if os.listdir(data_path):
-        while (response := input("Data directory isn't empty. Would you like to overwrite its contents? [y/n]")) not in ["y","n"]:
+        while (response := input("Data directory isn't empty. Would you like to overwrite its contents? [(y)/n]")) not in ["y","n",""]:
             pass
 
         if response == "n":
             print("Aborting.")
             sys.exit()
-        elif response == "y":
+        elif response == "y" or response == "":
             print("Removing existing files...")
             for i in os.listdir(data_path):
                 try:
