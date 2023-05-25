@@ -78,13 +78,13 @@ def get_urls(sd_version, weight_bits):
     return safetensors_v1_5 if sd_version == "1.5" else safetensors_v2_1, vocab_url
 
 if __name__ == "__main__":
-    print("Setting up model weights for diffusers-rs...")
-
-    parser = argparse.ArgumentParser(description="Setting up model weights for diffusers-rs...")
+    parser = argparse.ArgumentParser(description="Download weights for diffusers-rs.")
     parser.add_argument("--sd_version", "-v", choices=["2.1", "1.5"], default="2.1")
     parser.add_argument("--weight_bits", "-w", choices=["16", "32"], default="16")
     parser.add_argument("--use_cpu", "-c", action="store_true", default=False)
     args = parser.parse_args()
+
+    print("Setting up model weights for diffusers-rs...")
 
     safetensors, vocab_url = get_urls(args.sd_version, args.weight_bits)
     ensure_data_dir()
