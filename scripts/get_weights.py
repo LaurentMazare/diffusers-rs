@@ -20,7 +20,7 @@ def ensure_data_dir(safetensors):
         if len(conflicts) != 0:
             print("Error: please remove the following files from data directory:")
             print(conflicts)
-            sys.exit()
+            sys.exit("Found conflicting files in data directory.")
     else:
         os.mkdir(data_path)
 
