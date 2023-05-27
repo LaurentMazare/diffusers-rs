@@ -241,6 +241,17 @@ impl UNet2DConditionModel {
 
 impl UNet2DConditionModel {
     pub fn forward(&self, xs: &Tensor, timestep: f64, encoder_hidden_states: &Tensor) -> Tensor {
+        self.forward_with_additional_residuals(xs, timestep, encoder_hidden_states, None, None)
+    }
+
+    pub fn forward_with_additional_residuals(
+        &self,
+        xs: &Tensor,
+        timestep: f64,
+        encoder_hidden_states: &Tensor,
+        down_block_additional_residuals: Option<&[Tensor]>,
+        mid_block_additional_residual: Option<&Tensor>,
+    ) -> Tensor {
         let (bsize, _channels, height, width) = xs.size4().unwrap();
         let device = xs.device();
         let n_blocks = self.config.blocks.len();
@@ -269,8 +280,18 @@ impl UNet2DConditionModel {
             down_block_res_xs.extend(res_xs);
             xs = _xs;
         }
+        if let Some(down_block_additional_residuals) = down_block_additional_residuals {
+            for (i, residuals) in down_block_additional_residuals.iter().enumerate() {
+                down_block_res_xs[i] += residuals
+            }
+        }
+
         // 4. mid
         let xs = self.mid_block.forward(&xs, Some(&emb), Some(encoder_hidden_states));
+        let xs = match mid_block_additional_residual {
+            None => xs,
+            Some(m) => m + xs,
+        };
         // 5. up
         let mut xs = xs;
         let mut upsample_size = None;

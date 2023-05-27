@@ -37,6 +37,10 @@ required-features = ["clap"]
 name = "stable-diffusion-inpaint"
 required-features = ["clap"]
 
+[[example]]
+name = "controlnet"
+required-features = ["clap"]
+
 [features]
 doc-only = ["tch/doc-only"]
 
