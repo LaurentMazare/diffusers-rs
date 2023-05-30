@@ -117,7 +117,8 @@ fn image_preprocess<T: AsRef<std::path::Path>>(path: T) -> anyhow::Result<Tensor
     let height = height - height % 32;
     let width = width - width % 32;
     let image = tch::vision::image::resize(&image, width, height)?;
-    Ok((image / 255. * 2. - 1.).unsqueeze(0))
+    let image = (image / 255.).unsqueeze(0);
+    Ok(Tensor::f_cat(&[&image, &image], 0)?)
 }
 
 fn run(args: Args) -> anyhow::Result<()> {
