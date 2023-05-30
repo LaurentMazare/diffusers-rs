@@ -215,6 +215,8 @@ fn run(args: Args) -> anyhow::Result<()> {
     let vae = sd_config.build_vae(&vae_weights, vae_device)?;
     println!("Building the unet.");
     let unet = sd_config.build_unet(&unet_weights, unet_device, 4)?;
+    println!("Building the controlnet.");
+    let controlnet: diffusers::models::controlnet::ControlNet = todo!();
 
     let bsize = 1;
     for idx in 0..num_samples {
@@ -232,7 +234,15 @@ fn run(args: Args) -> anyhow::Result<()> {
             let latent_model_input = Tensor::cat(&[&latents, &latents], 0);
 
             let latent_model_input = scheduler.scale_model_input(latent_model_input, timestep);
-            let noise_pred = unet.forward(&latent_model_input, timestep as f64, &text_embeddings);
+            let (down_block_additional_residuals, mid_block_additional_residuals) =
+                controlnet.forward(&latent_model_input);
+            let noise_pred = unet.forward_with_additional_residuals(
+                &latent_model_input,
+                timestep as f64,
+                &text_embeddings,
+                Some(&[down_block_additional_residuals]),
+                Some(&mid_block_additional_residuals),
+            );
             let noise_pred = noise_pred.chunk(2, 0);
             let (noise_pred_uncond, noise_pred_text) = (&noise_pred[0], &noise_pred[1]);
             let noise_pred =

@@ -54,7 +54,7 @@ impl Default for UNet2DConditionModelConfig {
 }
 
 #[derive(Debug)]
-enum UNetDownBlock {
+pub(crate) enum UNetDownBlock {
     Basic(DownBlock2D),
     CrossAttn(CrossAttnDownBlock2D),
 }
