@@ -1,7 +1,7 @@
 use clap::Parser;
 use diffusers::pipelines::stable_diffusion;
 use diffusers::transformers::clip;
-use tch::{nn::Module, Device, Kind, Tensor};
+use tch::{nn, nn::Module, Device, Kind, Tensor};
 
 const GUIDANCE_SCALE: f64 = 7.5;
 
@@ -187,7 +187,7 @@ fn run(args: Args) -> anyhow::Result<()> {
         }
     };
 
-    let _image = image_preprocess(input_image)?;
+    let image = image_preprocess(input_image)?;
     let device_setup = diffusers::utils::DeviceSetup::new(cpu);
     let clip_device = device_setup.get("clip");
     let vae_device = device_setup.get("vae");
@@ -216,7 +216,9 @@ fn run(args: Args) -> anyhow::Result<()> {
     println!("Building the unet.");
     let unet = sd_config.build_unet(&unet_weights, unet_device, 4)?;
     println!("Building the controlnet.");
-    let controlnet: diffusers::models::controlnet::ControlNet = todo!();
+    let vs_controlnet = nn::VarStore::new(unet_device);
+    let controlnet =
+        diffusers::models::controlnet::ControlNet::new(vs_controlnet.root(), 4, Default::default());
 
     let bsize = 1;
     for idx in 0..num_samples {
@@ -234,13 +236,13 @@ fn run(args: Args) -> anyhow::Result<()> {
             let latent_model_input = Tensor::cat(&[&latents, &latents], 0);
 
             let latent_model_input = scheduler.scale_model_input(latent_model_input, timestep);
-            let (down_block_additional_residuals, mid_block_additional_residuals) =
-                controlnet.forward(&latent_model_input);
+            let (down_block_additional_residuals, mid_block_additional_residuals) = controlnet
+                .forward(&latent_model_input, timestep as f64, &text_embeddings, &image, 1.);
             let noise_pred = unet.forward_with_additional_residuals(
                 &latent_model_input,
                 timestep as f64,
                 &text_embeddings,
-                Some(&[down_block_additional_residuals]),
+                Some(&down_block_additional_residuals),
                 Some(&mid_block_additional_residuals),
             );
             let noise_pred = noise_pred.chunk(2, 0);
