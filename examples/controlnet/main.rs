@@ -33,16 +33,20 @@ struct Args {
     width: Option<i64>,
 
     /// The UNet weight file, in .ot or .safetensors format.
-    #[arg(long, value_name = "FILE")]
-    unet_weights: Option<String>,
+    #[arg(long, value_name = "FILE", default_value = "data/unet.safetensors")]
+    unet_weights: String,
+
+    /// The ControlNet weight file, in .ot or .safetensors format.
+    #[arg(long, value_name = "FILE", default_value = "data/controlnet.safetensors")]
+    controlnet_weights: String,
 
     /// The CLIP weight file, in .ot or .safetensors format.
-    #[arg(long, value_name = "FILE")]
-    clip_weights: Option<String>,
+    #[arg(long, value_name = "FILE", default_value = "data/pytorch_model.safetensors")]
+    clip_weights: String,
 
     /// The VAE weight file, in .ot or .safetensors format.
-    #[arg(long, value_name = "FILE")]
-    vae_weights: Option<String>,
+    #[arg(long, value_name = "FILE", default_value = "data/vae.safetensors")]
+    vae_weights: String,
 
     #[arg(long, value_name = "FILE", default_value = "data/bpe_simple_vocab_16e6.txt")]
     /// The file specifying the vocabulary to used for tokenization.
@@ -72,50 +76,9 @@ struct Args {
     #[arg(long, action)]
     autocast: bool,
 
-    #[arg(long, value_enum, default_value = "v2-1")]
-    sd_version: StableDiffusionVersion,
-
     /// Generate intermediary images at each step.
     #[arg(long, action)]
     intermediary_images: bool,
-}
-
-#[derive(Debug, Clone, Copy, clap::ValueEnum)]
-enum StableDiffusionVersion {
-    V1_5,
-    V2_1,
-}
-
-impl Args {
-    fn clip_weights(&self) -> String {
-        match &self.clip_weights {
-            Some(w) => w.clone(),
-            None => match self.sd_version {
-                StableDiffusionVersion::V1_5 => "data/pytorch_model.safetensors".to_string(),
-                StableDiffusionVersion::V2_1 => "data/clip_v2.1.safetensors".to_string(),
-            },
-        }
-    }
-
-    fn vae_weights(&self) -> String {
-        match &self.vae_weights {
-            Some(w) => w.clone(),
-            None => match self.sd_version {
-                StableDiffusionVersion::V1_5 => "data/vae.safetensors".to_string(),
-                StableDiffusionVersion::V2_1 => "data/vae_v2.1.safetensors".to_string(),
-            },
-        }
-    }
-
-    fn unet_weights(&self) -> String {
-        match &self.unet_weights {
-            Some(w) => w.clone(),
-            None => match self.sd_version {
-                StableDiffusionVersion::V1_5 => "data/unet.safetensors".to_string(),
-                StableDiffusionVersion::V2_1 => "data/unet_v2.1.safetensors".to_string(),
-            },
-        }
-    }
 }
 
 fn output_filename(
@@ -155,9 +118,6 @@ fn image_preprocess<T: AsRef<std::path::Path>>(path: T) -> anyhow::Result<Tensor
 }
 
 fn run(args: Args) -> anyhow::Result<()> {
-    let clip_weights = args.clip_weights();
-    let vae_weights = args.vae_weights();
-    let unet_weights = args.unet_weights();
     let Args {
         prompt,
         cpu,
@@ -169,8 +129,11 @@ fn run(args: Args) -> anyhow::Result<()> {
         final_image,
         sliced_attention_size,
         num_samples,
-        sd_version,
         input_image,
+        unet_weights,
+        vae_weights,
+        clip_weights,
+        controlnet_weights,
         ..
     } = args;
     tch::maybe_init_cuda();
@@ -178,14 +141,8 @@ fn run(args: Args) -> anyhow::Result<()> {
     println!("Cudnn available: {}", tch::Cuda::cudnn_is_available());
     println!("MPS available: {}", tch::utils::has_mps());
 
-    let sd_config = match sd_version {
-        StableDiffusionVersion::V1_5 => {
-            stable_diffusion::StableDiffusionConfig::v1_5(sliced_attention_size, height, width)
-        }
-        StableDiffusionVersion::V2_1 => {
-            stable_diffusion::StableDiffusionConfig::v2_1(sliced_attention_size, height, width)
-        }
-    };
+    let sd_config =
+        stable_diffusion::StableDiffusionConfig::v1_5(sliced_attention_size, height, width);
 
     let image = image_preprocess(input_image)?;
     let device_setup = diffusers::utils::DeviceSetup::new(cpu);
@@ -216,9 +173,10 @@ fn run(args: Args) -> anyhow::Result<()> {
     println!("Building the unet.");
     let unet = sd_config.build_unet(&unet_weights, unet_device, 4)?;
     println!("Building the controlnet.");
-    let vs_controlnet = nn::VarStore::new(unet_device);
+    let mut vs_controlnet = nn::VarStore::new(unet_device);
     let controlnet =
         diffusers::models::controlnet::ControlNet::new(vs_controlnet.root(), 4, Default::default());
+    vs_controlnet.load(controlnet_weights)?;
 
     let bsize = 1;
     for idx in 0..num_samples {
