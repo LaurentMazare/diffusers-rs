@@ -194,14 +194,16 @@ impl ControlNet {
         let mut controlnet_down_blocks = vec![controlnet_block];
         for (i, block) in config.blocks.iter().enumerate() {
             let out_channels = block.out_channels;
-            let conv1 = nn::conv2d(
-                &vs_c / controlnet_down_blocks.len(),
-                out_channels,
-                out_channels,
-                1,
-                Default::default(),
-            );
-            controlnet_down_blocks.push(conv1);
+            for _ in 0..config.layers_per_block {
+                let conv1 = nn::conv2d(
+                    &vs_c / controlnet_down_blocks.len(),
+                    out_channels,
+                    out_channels,
+                    1,
+                    Default::default(),
+                );
+                controlnet_down_blocks.push(conv1);
+            }
             if i + 1 != config.blocks.len() {
                 let conv2 = nn::conv2d(
                     &vs_c / controlnet_down_blocks.len(),

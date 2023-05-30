@@ -1,3 +1,6 @@
+// The additional weight files can be found on HuggingFace hub:
+// https://huggingface.co/lllyasviel/sd-controlnet-canny/blob/main/diffusion_pytorch_model.safetensors
+// This has to be copied in data/controlnet.safetensors
 use clap::Parser;
 use diffusers::pipelines::stable_diffusion;
 use diffusers::transformers::clip;
