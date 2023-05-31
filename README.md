@@ -86,6 +86,31 @@ be changed via the `-prompt` flag.
 
 ![inpaint output](media/out_inpaint.jpg)
 
+## ControlNet Pipeline
+
+The [ControlNet](https://github.com/lllyasviel/ControlNet) architecture can be
+used to control how stable diffusion generate images. This is to be used with
+the weights for stable diffusion 1.5 (see how to get these above). Additional
+weights have to be retrieved from this [HuggingFace
+repo](https://huggingface.co/lllyasviel/sd-controlnet-canny/blob/main/diffusion_pytorch_model.safetensors)
+and copied in `data/controlnet.safetensors`.
+
+The ControlNet pipeline takes as input a sample image, in the default mode it
+will perform edge detection on this image using the [Canny edge
+detector](https://en.wikipedia.org/wiki/Canny_edge_detector) and will use the
+resulting edge image as a guide.
+
+```bash
+cargo run --example controlnet --features clap,image,imageproc -- \
+  --prompt "a rusty robot, lit by a fire torch, hd, very detailed" \
+  --input-image media/vermeer.jpg
+```
+The `media/vermeer.jpg` image contains the following.
+![vermeer](media/vermeer.jpg)
+
+This results in the following image after edge detection.
+![vermeer-edges](media/vermeer-edges.png)
+
 ## FAQ
 
 ### Memory Issues
