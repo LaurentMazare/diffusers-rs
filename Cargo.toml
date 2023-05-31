@@ -1,6 +1,6 @@
 [package]
 name = "diffusers"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Laurent Mazare <lmazare@gmail.com>"]
 edition = "2021"
 build = "build.rs"

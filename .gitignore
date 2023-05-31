@@ -2,6 +2,7 @@ target/
 target2/
 _build/
 data/
+data*/
 gen/.merlin
 **/*.rs.bk
 *.swp
