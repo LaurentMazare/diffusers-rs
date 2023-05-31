@@ -111,14 +111,22 @@ fn output_filename(
     }
 }
 
+// TODO: Use an implementation of the Canny edge detector in PyTorch
+// and remove this dependency.
 fn image_preprocess<T: AsRef<std::path::Path>>(path: T) -> anyhow::Result<Tensor> {
-    let image = tch::vision::image::load(path)?;
-    let (_num_channels, height, width) = image.size3()?;
-    let height = height - height % 32;
-    let width = width - width % 32;
-    let image = tch::vision::image::resize(&image, width, height)?;
-    let image = (image / 255.).unsqueeze(0);
-    Ok(Tensor::f_cat(&[&image, &image], 0)?)
+    use image::EncodableLayout;
+    let image = image::open(path)?.to_luma8();
+    let edges = imageproc::edges::canny(&image, 50., 100.);
+    let tensor = Tensor::f_from_data_size(
+        edges.as_bytes(),
+        &[1, 1, edges.height() as i64, edges.width() as i64],
+        Kind::Uint8,
+    )?;
+    let tensor = Tensor::f_concat(&[&tensor, &tensor, &tensor], 1)?;
+    // In order to look at the detected edges, uncomment the following line:
+    // tch::vision::image::save(&tensor.squeeze(), "/tmp/edges.png").unwrap();
+    let tensor = Tensor::f_concat(&[&tensor, &tensor], 0)?;
+    Ok(tensor.to_kind(Kind::Float) / 255.)
 }
 
 fn run(args: Args) -> anyhow::Result<()> {

@@ -24,6 +24,8 @@ tch = "0.13"
 torch-sys = { version = "0.13", features = ["download-libtorch"] }
 
 clap = { version = "4.0.19", optional = true, features = ["derive"] }
+image = { version = "0.24.6", optional = true }
+imageproc = { version = "0.23.0", optional = true }
 
 [[example]]
 name = "stable-diffusion"
@@ -39,7 +41,7 @@ required-features = ["clap"]
 
 [[example]]
 name = "controlnet"
-required-features = ["clap"]
+required-features = ["clap", "imageproc"]
 
 [features]
 doc-only = ["tch/doc-only"]
