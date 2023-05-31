@@ -105,11 +105,9 @@ cargo run --example controlnet --features clap,image,imageproc -- \
   --prompt "a rusty robot, lit by a fire torch, hd, very detailed" \
   --input-image media/vermeer.jpg
 ```
-The `media/vermeer.jpg` image contains the following.
-![vermeer](media/vermeer.jpg)
-
-This results in the following image after edge detection.
-![vermeer-edges](media/vermeer-edges.png)
+The `media/vermeer.jpg` image is the well known painting on the left hand side,
+this results in the right hand side image after performing edge detection.
+<img src="https://raw.githubusercontent.com/LaurentMazare/diffusers-rs/main/media/vermeer.jpg" width=256><img src="https://raw.githubusercontent.com/LaurentMazare/diffusers-rs/main/media/vermeer-edges.png" width=256>
 
 ## FAQ
 
