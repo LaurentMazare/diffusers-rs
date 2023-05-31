@@ -43,7 +43,7 @@ impl tch::nn::Module for ControlNetConditioningEmbedding {
     fn forward(&self, xs: &Tensor) -> Tensor {
         let mut xs = xs.apply(&self.conv_in).silu();
         for (c1, c2) in self.blocks.iter() {
-            xs = xs.apply(c1).apply(c2).silu();
+            xs = xs.apply(c1).silu().apply(c2).silu();
         }
         xs.apply(&self.conv_out)
     }
@@ -141,7 +141,7 @@ impl ControlNet {
                     resnet_groups: config.norm_num_groups,
                     add_downsample: i < n_blocks - 1,
                     downsample_padding: config.downsample_padding,
-                    ..Default::default()
+                    output_scale_factor: 1.,
                 };
                 if use_cross_attn {
                     let config = CrossAttnDownBlock2DConfig {
