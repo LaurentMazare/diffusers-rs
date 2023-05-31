@@ -107,6 +107,7 @@ cargo run --example controlnet --features clap,image,imageproc -- \
 ```
 The `media/vermeer.jpg` image is the well known painting on the left hand side,
 this results in the right hand side image after performing edge detection.
+
 <img src="https://raw.githubusercontent.com/LaurentMazare/diffusers-rs/main/media/vermeer.jpg" width=256><img src="https://raw.githubusercontent.com/LaurentMazare/diffusers-rs/main/media/vermeer-edges.png" width=256>
 
 ## FAQ
