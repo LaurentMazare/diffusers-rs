@@ -280,11 +280,20 @@ impl UNet2DConditionModel {
             down_block_res_xs.extend(res_xs);
             xs = _xs;
         }
-        if let Some(down_block_additional_residuals) = down_block_additional_residuals {
-            for (i, residuals) in down_block_additional_residuals.iter().enumerate() {
-                down_block_res_xs[i] += residuals
-            }
-        }
+
+        let new_down_block_res_xs =
+            if let Some(down_block_additional_residuals) = down_block_additional_residuals {
+                let mut v = vec![];
+                // A previous version of this code had a bug because of the addition being made
+                // in place via += hence modifying the input of the mid block.
+                for (i, residuals) in down_block_additional_residuals.iter().enumerate() {
+                    v.push(&down_block_res_xs[i] + residuals)
+                }
+                v
+            } else {
+                down_block_res_xs
+            };
+        let mut down_block_res_xs = new_down_block_res_xs;
 
         // 4. mid
         let xs = self.mid_block.forward(&xs, Some(&emb), Some(encoder_hidden_states));
