@@ -110,6 +110,16 @@ this results in the right hand side image after performing edge detection.
 
 <img src="https://raw.githubusercontent.com/LaurentMazare/diffusers-rs/main/media/vermeer.jpg" width=256><img src="https://raw.githubusercontent.com/LaurentMazare/diffusers-rs/main/media/vermeer-edges.png" width=256>
 
+Using only the edge detection image, the ControlNet model generate the following
+samples.
+
+<img
+src="https://raw.githubusercontent.com/LaurentMazare/diffusers-rs/main/media/vermeer-out1.jpg"
+width=256><img
+src="https://raw.githubusercontent.com/LaurentMazare/diffusers-rs/main/media/vermeer-out2.jpg"
+width=256><img
+src="https://raw.githubusercontent.com/LaurentMazare/diffusers-rs/main/media/vermeer-out3.jpg" width=256>
+
 ## FAQ
 
 ### Memory Issues
