@@ -48,25 +48,6 @@ This generates some images of rusty robots holding some torches!
 
 <img src="media/robot8.jpg" width=256><img src="media/robot11.jpg" width=256><img src="media/robot13.jpg" width=256>
 
-## FAQ
-
-### Memory Issues
-
-This requires a GPU with more than 8GB of memory, as a fallback the CPU version can be used
-but is slower.
-
-```bash
-cargo run --example stable-diffusion --features clap -- --prompt "A very rusty robot holding a fire torch." --cpu all
-```
-
-For a GPU with 8GB, one can use the [fp16 weights for the UNet](https://huggingface.co/runwayml/stable-diffusion-v1-5/tree/fp16/unet) and put only the UNet on the GPU.
-
-```bash
-PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.6,max_split_size_mb:128 RUST_BACKTRACE=1 CARGO_TARGET_DIR=target2 cargo run \
-    --example stable-diffusion --features clap -- --cpu vae --cpu clip \
-    --unet-weights data/unet-fp16.safetensors
-```
-
 ## Image to Image Pipeline
 
 The stable diffusion model can also be used to generate an image based on
@@ -105,61 +86,21 @@ be changed via the `-prompt` flag.
 
 ![inpaint output](media/out_inpaint.jpg)
 
-## Converting the Original Weight Files
+## FAQ
 
-The weights can be retrieved as `.safetensors` or `.ot` files from
-huggingface [v2.1](https://huggingface.co/lmz/rust-stable-diffusion-v2-1).
-or [v1.5](https://huggingface.co/lmz/rust-stable-diffusion-v1-5). It is recommended
-to use the `.safetensors` versions.
+### Memory Issues
 
-It is also possible to download the weights for the original stable diffusion
-model and convert them to `.safetensors` files by following the instructions below
-or use the download scripts from the `scripts/` directiory.
-These instructions are for version 1.5 but can easily be adapted for version 2.1
-using this [model repo](https://huggingface.co/stabilityai/stable-diffusion-2-1)
-instead.
-
-First get the vocabulary file and uncompress it.
+This requires a GPU with more than 8GB of memory, as a fallback the CPU version can be used
+but is slower.
 
 ```bash
-mkdir -p data && cd data
-wget https://github.com/openai/CLIP/raw/main/clip/bpe_simple_vocab_16e6.txt.gz
-gunzip bpe_simple_vocab_16e6.txt.gz
+cargo run --example stable-diffusion --features clap -- --prompt "A very rusty robot holding a fire torch." --cpu all
 ```
 
-### Clip Encoding Weights
-
-For the clip encoding weights, start by downloading the weight file.
+For a GPU with 8GB, one can use the [fp16 weights for the UNet](https://huggingface.co/runwayml/stable-diffusion-v1-5/tree/fp16/unet) and put only the UNet on the GPU.
 
 ```bash
-wget https://huggingface.co/openai/clip-vit-large-patch14/resolve/main/pytorch_model.bin
-```
-
-Then using Python, load the weights and save them in a `.safetensors` file.
-
-```python
-import numpy as np
-import torch
-from safetensors.torch import save_file
-
-model = torch.load("./pytorch_model.bin")
-tensors = {k: v.clone().detach() for k, v in model.items() if 'text_model' in k}
-save_file(tensors, 'pytorch_model.safetensors')
-```
-
-### VAE and Unet Weights
-
-The weight files can be downloaded from huggingface's hub but it first requires you to log in (and to [accept the terms of use](https://huggingface.co/runwayml/stable-diffusion-v1-5) the first time). Then you can download the [VAE weights](https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/vae/diffusion_pytorch_model.bin) and [Unet weights](https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/unet/diffusion_pytorch_model.bin).
-
-After downloading the files, use Python to convert them to `npz` files.
-
-```python
-import torch
-from safetensors.torch import save_file
-
-model = torch.load('./vae.bin')
-save_file(dict(model), './vae.safetensors')
-
-model = torch.load('./unet.bin')
-save_file(dict(model), './unet.safetensors')
+PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.6,max_split_size_mb:128 RUST_BACKTRACE=1 CARGO_TARGET_DIR=target2 cargo run \
+    --example stable-diffusion --features clap -- --cpu vae --cpu clip \
+    --unet-weights data/unet-fp16.safetensors
 ```
