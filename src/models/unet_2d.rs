@@ -54,7 +54,7 @@ impl Default for UNet2DConditionModelConfig {
 }
 
 #[derive(Debug)]
-enum UNetDownBlock {
+pub(crate) enum UNetDownBlock {
     Basic(DownBlock2D),
     CrossAttn(CrossAttnDownBlock2D),
 }
@@ -241,6 +241,17 @@ impl UNet2DConditionModel {
 
 impl UNet2DConditionModel {
     pub fn forward(&self, xs: &Tensor, timestep: f64, encoder_hidden_states: &Tensor) -> Tensor {
+        self.forward_with_additional_residuals(xs, timestep, encoder_hidden_states, None, None)
+    }
+
+    pub fn forward_with_additional_residuals(
+        &self,
+        xs: &Tensor,
+        timestep: f64,
+        encoder_hidden_states: &Tensor,
+        down_block_additional_residuals: Option<&[Tensor]>,
+        mid_block_additional_residual: Option<&Tensor>,
+    ) -> Tensor {
         let (bsize, _channels, height, width) = xs.size4().unwrap();
         let device = xs.device();
         let n_blocks = self.config.blocks.len();
@@ -269,8 +280,27 @@ impl UNet2DConditionModel {
             down_block_res_xs.extend(res_xs);
             xs = _xs;
         }
+
+        let new_down_block_res_xs =
+            if let Some(down_block_additional_residuals) = down_block_additional_residuals {
+                let mut v = vec![];
+                // A previous version of this code had a bug because of the addition being made
+                // in place via += hence modifying the input of the mid block.
+                for (i, residuals) in down_block_additional_residuals.iter().enumerate() {
+                    v.push(&down_block_res_xs[i] + residuals)
+                }
+                v
+            } else {
+                down_block_res_xs
+            };
+        let mut down_block_res_xs = new_down_block_res_xs;
+
         // 4. mid
         let xs = self.mid_block.forward(&xs, Some(&emb), Some(encoder_hidden_states));
+        let xs = match mid_block_additional_residual {
+            None => xs,
+            Some(m) => m + xs,
+        };
         // 5. up
         let mut xs = xs;
         let mut upsample_size = None;
