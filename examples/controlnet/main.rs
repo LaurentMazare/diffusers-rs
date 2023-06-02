@@ -82,6 +82,10 @@ struct Args {
     /// Generate intermediary images at each step.
     #[arg(long, action)]
     intermediary_images: bool,
+
+    /// The type of ControlNet model to be used.
+    #[arg(long, value_enum, default_value = "canny")]
+    control_type: ControlType,
 }
 
 fn output_filename(
@@ -111,22 +115,33 @@ fn output_filename(
     }
 }
 
-// TODO: Use an implementation of the Canny edge detector in PyTorch
-// and remove this dependency.
-fn image_preprocess<T: AsRef<std::path::Path>>(path: T) -> anyhow::Result<Tensor> {
-    use image::EncodableLayout;
-    let image = image::open(path)?.to_luma8();
-    let edges = imageproc::edges::canny(&image, 50., 100.);
-    let tensor = Tensor::f_from_data_size(
-        edges.as_bytes(),
-        &[1, 1, edges.height() as i64, edges.width() as i64],
-        Kind::Uint8,
-    )?;
-    let tensor = Tensor::f_concat(&[&tensor, &tensor, &tensor], 1)?;
-    // In order to look at the detected edges, uncomment the following line:
-    // tch::vision::image::save(&tensor.squeeze(), "/tmp/edges.png").unwrap();
-    let tensor = Tensor::f_concat(&[&tensor, &tensor], 0)?;
-    Ok(tensor.to_kind(Kind::Float) / 255.)
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum ControlType {
+    Canny,
+}
+
+impl ControlType {
+    fn image_preprocess<T: AsRef<std::path::Path>>(&self, path: T) -> anyhow::Result<Tensor> {
+        match self {
+            Self::Canny => {
+                // TODO: Use an implementation of the Canny edge detector in PyTorch
+                // and remove this dependency.
+                use image::EncodableLayout;
+                let image = image::open(path)?.to_luma8();
+                let edges = imageproc::edges::canny(&image, 50., 100.);
+                let tensor = Tensor::f_from_data_size(
+                    edges.as_bytes(),
+                    &[1, 1, edges.height() as i64, edges.width() as i64],
+                    Kind::Uint8,
+                )?;
+                let tensor = Tensor::f_concat(&[&tensor, &tensor, &tensor], 1)?;
+                // In order to look at the detected edges, uncomment the following line:
+                // tch::vision::image::save(&tensor.squeeze(), "/tmp/edges.png").unwrap();
+                let tensor = Tensor::f_concat(&[&tensor, &tensor], 0)?;
+                Ok(tensor.to_kind(Kind::Float) / 255.)
+            }
+        }
+    }
 }
 
 fn run(args: Args) -> anyhow::Result<()> {
@@ -146,6 +161,7 @@ fn run(args: Args) -> anyhow::Result<()> {
         vae_weights,
         clip_weights,
         controlnet_weights,
+        control_type,
         ..
     } = args;
     tch::maybe_init_cuda();
@@ -156,7 +172,7 @@ fn run(args: Args) -> anyhow::Result<()> {
     let sd_config =
         stable_diffusion::StableDiffusionConfig::v1_5(sliced_attention_size, height, width);
 
-    let image = image_preprocess(input_image)?;
+    let image = control_type.image_preprocess(input_image)?;
     let device_setup = diffusers::utils::DeviceSetup::new(cpu);
     let clip_device = device_setup.get("clip");
     let vae_device = device_setup.get("vae");
