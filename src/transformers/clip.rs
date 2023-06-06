@@ -17,8 +17,8 @@ pub enum Activation {
 impl Module for Activation {
     fn forward(&self, xs: &Tensor) -> Tensor {
         match self {
-            Activation::QuickGelu => xs * (xs * 1.702).sigmoid(),
-            Activation::Gelu => xs.gelu("none"),
+            Self::QuickGelu => xs * (xs * 1.702).sigmoid(),
+            Self::Gelu => xs.gelu("none"),
         }
     }
 }
@@ -351,7 +351,7 @@ impl Tokenizer {
     pub fn create<T: AsRef<std::path::Path> + std::fmt::Debug>(
         bpe_path: T,
         c: &Config,
-    ) -> anyhow::Result<Tokenizer> {
+    ) -> anyhow::Result<Self> {
         let bpe_file = crate::utils::file_open(bpe_path)?;
         let bpe_lines: Result<Vec<String>, _> = std::io::BufReader::new(bpe_file).lines().collect();
         let bpe_lines = bpe_lines?;
@@ -366,7 +366,7 @@ impl Tokenizer {
             })
             .collect();
         let bpe_lines = bpe_lines?;
-        let mut vocab: Vec<String> = Vec::new();
+        let mut vocab: Vec<String> = vec![];
         for (_index, elem) in BYTES_TO_UNICODE {
             vocab.push(elem.into())
         }
@@ -385,7 +385,7 @@ impl Tokenizer {
         let bpe_ranks: HashMap<_, _> =
             bpe_lines.into_iter().enumerate().map(|(i, v)| (v, i)).collect();
         let re = regex::Regex::new(PAT)?;
-        let tokenizer = Tokenizer {
+        let tokenizer = Self {
             encoder,
             re,
             bpe_ranks,
@@ -410,7 +410,7 @@ impl Tokenizer {
     fn bpe(&self, token: &str) -> Vec<usize> {
         let mut word: Vec<String> = token.chars().map(|x| x.to_string()).collect();
         if word.is_empty() {
-            return Vec::new();
+            return vec![];
         }
         let last_index = word.len() - 1;
         word[last_index] = format!("{}</w>", word[last_index]);
@@ -517,7 +517,7 @@ impl ClipTextEmbeddings {
         let position_ids =
             Tensor::arange(c.max_position_embeddings as i64, (Kind::Int64, vs.device()))
                 .expand([1, -1], false);
-        ClipTextEmbeddings { token_embedding, position_embedding, position_ids }
+        Self { token_embedding, position_embedding, position_ids }
     }
 }
 
@@ -550,7 +550,7 @@ impl ClipAttention {
         let out_proj = nn::linear(&vs / "out_proj", embed_dim, embed_dim, Default::default());
         let head_dim = embed_dim / num_attention_heads;
         let scale = (head_dim as f64).powf(-0.5);
-        ClipAttention { k_proj, v_proj, q_proj, out_proj, head_dim, scale, num_attention_heads }
+        Self { k_proj, v_proj, q_proj, out_proj, head_dim, scale, num_attention_heads }
     }
 
     fn shape(&self, xs: &Tensor, seq_len: i64, bsz: i64) -> Tensor {
@@ -594,7 +594,7 @@ impl ClipMlp {
     fn new(vs: nn::Path, c: &Config) -> Self {
         let fc1 = nn::linear(&vs / "fc1", c.embed_dim, c.intermediate_size, Default::default());
         let fc2 = nn::linear(&vs / "fc2", c.intermediate_size, c.embed_dim, Default::default());
-        ClipMlp { fc1, fc2, activation: c.activation }
+        Self { fc1, fc2, activation: c.activation }
     }
 }
 
@@ -621,7 +621,7 @@ impl ClipEncoderLayer {
         let mlp = ClipMlp::new(&vs / "mlp", c);
         let layer_norm2 =
             nn::layer_norm(&vs / "layer_norm2", vec![c.embed_dim], Default::default());
-        ClipEncoderLayer { self_attn, layer_norm1, mlp, layer_norm2 }
+        Self { self_attn, layer_norm1, mlp, layer_norm2 }
     }
 
     fn forward(&self, xs: &Tensor, causal_attention_mask: &Tensor) -> Tensor {
@@ -645,12 +645,12 @@ struct ClipEncoder {
 impl ClipEncoder {
     fn new(vs: nn::Path, c: &Config) -> Self {
         let vs = &vs / "layers";
-        let mut layers: Vec<ClipEncoderLayer> = Vec::new();
+        let mut layers: Vec<ClipEncoderLayer> = vec![];
         for index in 0..c.num_hidden_layers {
             let layer = ClipEncoderLayer::new(&vs / index, c);
             layers.push(layer)
         }
-        ClipEncoder { layers }
+        Self { layers }
     }
 
     fn forward(&self, xs: &Tensor, causal_attention_mask: &Tensor) -> Tensor {
@@ -677,7 +677,7 @@ impl ClipTextTransformer {
         let encoder = ClipEncoder::new(&vs / "encoder", c);
         let final_layer_norm =
             nn::layer_norm(&vs / "final_layer_norm", vec![c.embed_dim], Default::default());
-        ClipTextTransformer { embeddings, encoder, final_layer_norm }
+        Self { embeddings, encoder, final_layer_norm }
     }
 
     // https://github.com/huggingface/transformers/blob/674f750a57431222fa2832503a108df3badf1564/src/transformers/models/clip/modeling_clip.py#L678

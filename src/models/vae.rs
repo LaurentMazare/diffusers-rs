@@ -222,7 +222,7 @@ impl DiagonalGaussianDistribution {
         let logvar = parameters.next().unwrap();
         let std = (logvar * 0.5).exp();
         let device = std.device();
-        DiagonalGaussianDistribution { mean, std, device }
+        Self { mean, std, device }
     }
 
     pub fn sample(&self) -> Tensor {

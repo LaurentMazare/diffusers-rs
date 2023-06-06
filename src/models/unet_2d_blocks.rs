@@ -27,7 +27,7 @@ impl Downsample2D {
         } else {
             None
         };
-        Downsample2D { conv, padding }
+        Self { conv, padding }
     }
 }
 

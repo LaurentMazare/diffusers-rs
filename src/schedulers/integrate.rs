@@ -16,7 +16,7 @@ pub struct Output {
 
 impl Output {
     fn scale(self, c: f64) -> Self {
-        Output {
+        Self {
             num_function_evaluations: self.num_function_evaluations,
             error_estimate: c * self.error_estimate,
             integral: c * self.integral,
