@@ -139,7 +139,7 @@ impl PNDMScheduler {
         let (mut model_output, mut sample) = (model_output.shallow_clone(), sample.shallow_clone());
 
         if n_ets == 1 && self.counter == 0 {
-            self.cur_sample = Some(sample.shallow_clone());
+            self.cur_sample = sample.shallow_clone().into();
         } else if n_ets == 1 && self.counter == 1 {
             sample = self.cur_sample.as_ref().unwrap().shallow_clone();
             self.cur_sample = None;

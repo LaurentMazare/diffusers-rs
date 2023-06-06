@@ -304,7 +304,7 @@ impl KDPM2AncestralDiscreteScheduler {
             let dt = sigma_interpol - sigma_hat;
 
             // store for 2nd order step
-            self.sample = Some(sample.shallow_clone());
+            self.sample = sample.shallow_clone().into();
             prev_sample = sample + derivative * dt;
         } else {
             // DPM-Solver-2

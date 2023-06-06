@@ -195,7 +195,7 @@ impl HeunDiscreteScheduler {
             // store for 2nd order step
             self.prev_derivative = Some(derivative.shallow_clone());
             self.dt = Some(dt);
-            self.sample = Some(sample.shallow_clone());
+            self.sample = sample.shallow_clone().into();
         } else {
             // free dt and derivative
             // Note, this puts the scheduler in "first order mode"

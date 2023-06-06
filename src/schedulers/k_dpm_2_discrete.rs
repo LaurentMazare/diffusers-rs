@@ -264,11 +264,11 @@ impl KDPM2DiscreteScheduler {
             )
         };
 
-        if self.state_in_first_order() {
+        self.sample = if self.state_in_first_order() {
             // store for 2nd order step
-            self.sample = Some(sample.shallow_clone());
+            sample.shallow_clone().into()
         } else {
-            self.sample = None
+            None
         };
 
         sample + derivative * dt

@@ -131,14 +131,13 @@ impl DownEncoderBlock2D {
                 .collect()
         };
         let downsampler = if config.add_downsample {
-            let downsample = Downsample2D::new(
+            Downsample2D::new(
                 &(&vs / "downsamplers") / 0,
                 out_channels,
                 true,
                 out_channels,
                 config.downsample_padding,
-            );
-            Some(downsample)
+            ).into()
         } else {
             None
         };
@@ -212,8 +211,7 @@ impl UpDecoderBlock2D {
                 .collect()
         };
         let upsampler = if config.add_upsample {
-            let upsample = Upsample2D::new(&vs / "upsamplers" / 0, out_channels, out_channels);
-            Some(upsample)
+            Upsample2D::new(&vs / "upsamplers" / 0, out_channels, out_channels).into()
         } else {
             None
         };
@@ -450,14 +448,13 @@ impl DownBlock2D {
             })
             .collect();
         let downsampler = if config.add_downsample {
-            let downsampler = Downsample2D::new(
+            Downsample2D::new(
                 &vs / "downsamplers" / 0,
                 out_channels,
                 true,
                 out_channels,
                 config.downsample_padding,
-            );
-            Some(downsampler)
+            ).into()
         } else {
             None
         };
@@ -632,8 +629,7 @@ impl UpBlock2D {
             })
             .collect();
         let upsampler = if config.add_upsample {
-            let upsampler = Upsample2D::new(&vs / "upsamplers" / 0, out_channels, out_channels);
-            Some(upsampler)
+            Upsample2D::new(&vs / "upsamplers" / 0, out_channels, out_channels).into()
         } else {
             None
         };
