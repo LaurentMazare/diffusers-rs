@@ -28,7 +28,7 @@ def ensure_data_dir(safetensors):
 
 def get_safetensors(safetensors, weight_bits):
     for name, url in safetensors.items():
-        print(f"Getting {name} {weight_bits} bit tensors...")
+        print(f"Getting {name} {weight_bits} bit tensors with {url}...")
 
         # Download bin file
         urllib.request.urlretrieve(url, os.path.join(data_path, f"{name}.bin"))
@@ -61,17 +61,23 @@ def get_urls(sd_version, weight_bits):
         "pytorch_model": f"https://huggingface.co/openai/clip-vit-large-patch14/resolve/main/pytorch_model.bin"
     }
     safetensors_v2_1 = {
-        "vae_v2.1": f"https://huggingface.co/stabilityai/stable-diffusion-2-1/resolve/{branch}/vae/diffusion_pytorch_model.bin",
+        "vae_v2.1": f"https://huggingface.co/stabilityai/stable-diffusion-2-/resolve/{branch}/vae/diffusion_pytorch_model.bin",
         "unet_v2.1": f"https://huggingface.co/stabilityai/stable-diffusion-2-1/resolve/{branch}/unet/diffusion_pytorch_model.bin",
         "clip_v2.1": f"https://huggingface.co/stabilityai/stable-diffusion-2-1/resolve/{branch}/text_encoder/pytorch_model.bin"
     }
+    safetensors_v2_0 = {
+        "vae_v2.0": f"https://huggingface.co/stabilityai/stable-diffusion-2/resolve/{branch}/vae/diffusion_pytorch_model.bin",
+        "unet_v2.0": f"https://huggingface.co/stabilityai/stable-diffusion-2/resolve/{branch}/unet/diffusion_pytorch_model.bin",
+        "clip_v2.0": f"https://huggingface.co/stabilityai/stable-diffusion-2/resolve/{branch}/text_encoder/pytorch_model.bin"
+    }
+
     vocab_url = "https://github.com/openai/CLIP/raw/main/clip/bpe_simple_vocab_16e6.txt.gz"
 
-    return safetensors_v1_5 if sd_version == "1.5" else safetensors_v2_1, vocab_url
+    return safetensors_v1_5 if sd_version == "1.5" else (safetensors_v2_1 if sd_version == "2.1" else safetensors_v2_0), vocab_url
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Download weights for diffusers-rs.")
-    parser.add_argument("--sd_version", "-v", choices=["2.1", "1.5"], default="2.1")
+    parser.add_argument("--sd_version", "-v", choices=["2.1", "1.5", "2.0"], default="2.0")
     parser.add_argument("--weight_bits", "-w", choices=["16", "32"], default="16")
     args = parser.parse_args()
 

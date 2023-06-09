@@ -13,3 +13,4 @@ __pycache__
 .*~
 sd_*jpg
 sd_*png
+*.code-workspace

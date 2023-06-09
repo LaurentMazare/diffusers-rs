@@ -138,6 +138,7 @@ struct Args {
 enum StableDiffusionVersion {
     V1_5,
     V2_1,
+    V2_0,
 }
 
 impl Args {
@@ -147,6 +148,7 @@ impl Args {
             None => match self.sd_version {
                 StableDiffusionVersion::V1_5 => "data/pytorch_model.safetensors".to_string(),
                 StableDiffusionVersion::V2_1 => "data/clip_v2.1.safetensors".to_string(),
+                StableDiffusionVersion::V2_0 => "data/clip_v2.0.safetensors".to_string(),
             },
         }
     }
@@ -157,6 +159,7 @@ impl Args {
             None => match self.sd_version {
                 StableDiffusionVersion::V1_5 => "data/vae.safetensors".to_string(),
                 StableDiffusionVersion::V2_1 => "data/vae_v2.1.safetensors".to_string(),
+                StableDiffusionVersion::V2_0 => "data/vae_v2.0.safetensors".to_string(),
             },
         }
     }
@@ -167,6 +170,7 @@ impl Args {
             None => match self.sd_version {
                 StableDiffusionVersion::V1_5 => "data/unet.safetensors".to_string(),
                 StableDiffusionVersion::V2_1 => "data/unet_v2.1.safetensors".to_string(),
+                StableDiffusionVersion::V2_0 => "data/unet_v2.0.safetensors".to_string(),
             },
         }
     }
@@ -229,6 +233,9 @@ fn run(args: Args) -> anyhow::Result<()> {
         StableDiffusionVersion::V2_1 => {
             stable_diffusion::StableDiffusionConfig::v2_1(sliced_attention_size, height, width)
         }
+        StableDiffusionVersion::V2_0 => {
+            stable_diffusion::StableDiffusionConfig::v2_1(sliced_attention_size, height, width)
+        }
     };
 
     let device_setup = diffusers::utils::DeviceSetup::new(cpu);
@@ -242,7 +249,7 @@ fn run(args: Args) -> anyhow::Result<()> {
     let tokens = tokenizer.encode(&prompt)?;
     let tokens: Vec<i64> = tokens.into_iter().map(|x| x as i64).collect();
     let tokens = Tensor::from_slice(&tokens).view((1, -1)).to(clip_device);
-    let uncond_tokens = tokenizer.encode("")?;
+    let uncond_tokens = tokenizer.encode("words, borders, bad quality, ugly")?;
     let uncond_tokens: Vec<i64> = uncond_tokens.into_iter().map(|x| x as i64).collect();
     let uncond_tokens = Tensor::from_slice(&uncond_tokens).view((1, -1)).to(clip_device);
 
