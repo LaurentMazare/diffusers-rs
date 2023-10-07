@@ -28,7 +28,7 @@ moved in the `data/` directory.
   [v1.5 repo](https://huggingface.co/lmz/rust-stable-diffusion-v1-5/tree/main/weights).
 - Alternatively, you can run the following python script.
 ```bash
-# Add --sd_version 1.5 to get the v1.5 weights rather than the v2.1.
+# Add --sd-version v1-5 to get the v1.5 weights rather than the v2.1.
 python3 ./scripts/get_weights.py
 ```
 
